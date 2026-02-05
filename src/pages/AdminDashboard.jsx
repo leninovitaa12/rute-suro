@@ -1,6 +1,5 @@
 import React from 'react'
-import { supabase } from '../lib/supabase.js'
-import { api } from '../lib/api.js'
+import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
@@ -13,6 +12,49 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
 })
+
+// Mock data untuk demo (tanpa Supabase)
+const mockEventsData = [
+  {
+    id: 1,
+    name: 'Kirab Pusaka Grebeg Suro',
+    description: 'Kirab pusaka dari alun-alun ke Ponorogo',
+    start_time: '2024-08-01T08:00:00',
+    end_time: '2024-08-01T12:00:00',
+    lat: -7.871,
+    lng: 111.462
+  },
+  {
+    id: 2,
+    name: 'Festival Reog',
+    description: 'Pertunjukan reog di lapangan',
+    start_time: '2024-08-02T10:00:00',
+    end_time: '2024-08-02T16:00:00',
+    lat: -7.873,
+    lng: 111.465
+  }
+]
+
+const mockClosuresData = [
+  {
+    id: 1,
+    event_id: 1,
+    type: 'CLOSED',
+    reason: 'Jalur kirab pusaka',
+    start_time: '2024-08-01T07:00:00',
+    end_time: '2024-08-01T13:00:00',
+    edges: [
+      {
+        polyline: [
+          { lat: -7.871, lng: 111.462 },
+          { lat: -7.872, lng: 111.463 },
+          { lat: -7.873, lng: 111.464 }
+        ]
+      }
+    ],
+    created_at: '2024-07-20T10:00:00'
+  }
+]
 
 function toIsoOrNull(dtLocal) {
   if (!dtLocal) return null
@@ -31,16 +73,31 @@ function MapPicker({ onPick }) {
 }
 
 export default function AdminDashboard() {
-  const [tab, setTab] = React.useState('events') // events | closures
-  const [events, setEvents] = React.useState([])
-  const [closures, setClosures] = React.useState([])
+  const navigate = useNavigate()
+  const [tab, setTab] = React.useState('events')
+  const [events, setEvents] = React.useState([...mockEventsData])
+  const [closures, setClosures] = React.useState([...mockClosuresData])
   const [msg, setMsg] = React.useState('')
 
+  // Check authentication
+  React.useEffect(() => {
+    const isLoggedIn = localStorage.getItem('adminLoggedIn')
+    if (isLoggedIn !== 'true') {
+      navigate('/admin')
+    }
+  }, [navigate])
+
+  // Logout function
+  function handleLogout() {
+    localStorage.removeItem('adminLoggedIn')
+    localStorage.removeItem('adminEmail')
+    navigate('/admin')
+  }
+
   async function reload() {
-    const ev = await supabase.from('events').select('*').order('start_time', { ascending: true })
-    setEvents(ev.data || [])
-    const cl = await supabase.from('closures').select('*').order('created_at', { ascending: false })
-    setClosures(cl.data || [])
+    // In production, this would fetch from Supabase
+    // For now, we're using mock data
+    setMsg('Data loaded (demo mode)')
   }
 
   React.useEffect(() => { reload() }, [])
@@ -63,7 +120,7 @@ export default function AdminDashboard() {
     if (!evForm.name) return setMsg('Nama event wajib')
 
     const payload = {
-      id: evForm.id ?? undefined,
+      id: evForm.id ?? Date.now(),
       name: evForm.name,
       description: evForm.description || null,
       start_time: toIsoOrNull(evForm.start_time),
@@ -73,19 +130,18 @@ export default function AdminDashboard() {
     }
 
     if (evForm.id) {
-      const { error } = await supabase.from('events').update(payload).eq('id', evForm.id)
-      if (error) return setMsg(error.message)
+      // Update existing
+      setEvents(events.map(e => e.id === evForm.id ? payload : e))
     } else {
-      const { error } = await supabase.from('events').insert(payload)
-      if (error) return setMsg(error.message)
+      // Add new
+      setEvents([...events, payload])
     }
 
     setEvForm({
       id: null, name: '', description: '', start_time: '', end_time: '',
       lat: DEFAULT_CENTER[0], lng: DEFAULT_CENTER[1]
     })
-    await reload()
-    setMsg('Event tersimpan.')
+    setMsg('Event tersimpan (demo mode).')
   }
 
   function editEvent(ev) {
@@ -103,9 +159,8 @@ export default function AdminDashboard() {
 
   async function deleteEvent(id) {
     if (!confirm('Hapus event?')) return
-    const { error } = await supabase.from('events').delete().eq('id', id)
-    if (error) setMsg(error.message)
-    await reload()
+    setEvents(events.filter(e => e.id !== id))
+    setMsg('Event dihapus (demo mode).')
   }
 
   // =========================
@@ -132,14 +187,19 @@ export default function AdminDashboard() {
 
   async function deriveEdges() {
     if (!pickA || !pickB) return setMsg('Klik 2 titik di peta untuk menentukan ruas (A lalu B).')
-    setMsg('Mengambil edge dari OSMnx...')
-    try {
-      const res = await api.post('/admin/derive_edges', { a: pickA, b: pickB })
-      setDerivedEdges(res.data || [])
-      setMsg(`Edges didapat: ${res.data?.length || 0}. Klik Simpan Rekayasa.`)
-    } catch (e) {
-      setMsg('Gagal derive: ' + (e?.response?.data?.error || e.message))
-    }
+    setMsg('Mengambil edge (demo mode)...')
+    
+    // Mock derived edges for demo
+    const mockEdges = [{
+      polyline: [
+        { lat: pickA.lat, lng: pickA.lng },
+        { lat: (pickA.lat + pickB.lat) / 2, lng: (pickA.lng + pickB.lng) / 2 },
+        { lat: pickB.lat, lng: pickB.lng }
+      ]
+    }]
+    
+    setDerivedEdges(mockEdges)
+    setMsg(`Edges didapat: ${mockEdges.length} (demo mode). Klik Simpan Rekayasa.`)
   }
 
   async function saveClosure() {
@@ -147,27 +207,25 @@ export default function AdminDashboard() {
     if (!derivedEdges.length) return setMsg('Edges kosong. Klik 2 titik lalu Derive dulu.')
 
     const payload = {
-      id: clForm.id ?? undefined,
+      id: clForm.id ?? Date.now(),
       event_id: clForm.event_id || null,
       type: clForm.type,
       reason: clForm.reason || null,
       start_time: toIsoOrNull(clForm.start_time),
       end_time: toIsoOrNull(clForm.end_time),
-      edges: derivedEdges
+      edges: derivedEdges,
+      created_at: new Date().toISOString()
     }
 
     if (clForm.id) {
-      const { error } = await supabase.from('closures').update(payload).eq('id', clForm.id)
-      if (error) return setMsg(error.message)
+      setClosures(closures.map(c => c.id === clForm.id ? payload : c))
     } else {
-      const { error } = await supabase.from('closures').insert(payload)
-      if (error) return setMsg(error.message)
+      setClosures([payload, ...closures])
     }
 
     setClForm({ id:null, event_id:'', type:'CLOSED', reason:'', start_time:'', end_time:'' })
     resetPick()
-    await reload()
-    setMsg('Rekayasa tersimpan.')
+    setMsg('Rekayasa tersimpan (demo mode).')
   }
 
   function editClosure(c) {
@@ -185,73 +243,77 @@ export default function AdminDashboard() {
 
   async function deleteClosure(id) {
     if (!confirm('Hapus rekayasa?')) return
-    const { error } = await supabase.from('closures').delete().eq('id', id)
-    if (error) setMsg(error.message)
-    await reload()
+    setClosures(closures.filter(c => c.id !== id))
+    setMsg('Rekayasa dihapus (demo mode).')
   }
 
   return (
-    <div className="container">
-      <div className="row" style={{justifyContent:'space-between'}}>
-        <h3 style={{margin:0}}>Admin Panel</h3>
-        <div className="row">
-          <button className={"btn " + (tab==='events' ? '' : 'secondary')} onClick={()=>setTab('events')}>Data Event</button>
-          <button className={"btn " + (tab==='closures' ? '' : 'secondary')} onClick={()=>setTab('closures')}>Rekayasa</button>
+    <div className="container" style={{marginTop: '20px'}}>
+      <div className="row" style={{justifyContent:'space-between', alignItems:'center'}}>
+        <h3 style={{margin:0}}>Admin Panel - Dashboard Rekayasa Lalu Lintas</h3>
+        <div className="row" style={{gap: '10px'}}>
+          <span className="small" style={{alignSelf:'center', color:'#666'}}>
+            {localStorage.getItem('adminEmail')}
+          </span>
+          <button className="btn secondary" onClick={handleLogout}>Logout</button>
         </div>
       </div>
 
-      {msg && <p className="small" style={{color:'#991b1b'}}>{msg}</p>}
+      <div className="row" style={{marginTop: '20px', marginBottom: '20px'}}>
+        <button className={"btn " + (tab==='events' ? '' : 'secondary')} onClick={()=>setTab('events')}>Data Event</button>
+        <button className={"btn " + (tab==='closures' ? '' : 'secondary')} onClick={()=>setTab('closures')}>Rekayasa Lalu Lintas</button>
+      </div>
+
+      {msg && <p className="small" style={{color:'#991b1b', padding: '10px', backgroundColor: '#fee', borderRadius: '4px'}}>{msg}</p>}
 
       {tab === 'events' && (
         <div className="grid">
           <div className="card">
-            <h4 style={{marginTop:0}}>{evForm.id ? 'Edit Event' : 'Tambah Event'}</h4>
+            <h4 style={{marginTop:0}}>{evForm.id ? 'Edit Event' : 'Tambah Event Baru'}</h4>
 
-            <label className="label">Nama</label>
-            <input className="input" value={evForm.name} onChange={e=>setEvForm({...evForm, name:e.target.value})} />
+            <label className="label">Nama Event</label>
+            <input className="input" value={evForm.name} onChange={e=>setEvForm({...evForm, name:e.target.value})} placeholder="Contoh: Kirab Pusaka" />
 
             <div style={{height:10}} />
             <label className="label">Deskripsi</label>
-            <input className="input" value={evForm.description} onChange={e=>setEvForm({...evForm, description:e.target.value})} />
+            <input className="input" value={evForm.description} onChange={e=>setEvForm({...evForm, description:e.target.value})} placeholder="Detail acara" />
 
             <div style={{height:10}} />
-            <label className="label">Start Time (optional)</label>
+            <label className="label">Waktu Mulai</label>
             <input className="input" type="datetime-local" value={evForm.start_time} onChange={e=>setEvForm({...evForm, start_time:e.target.value})} />
 
             <div style={{height:10}} />
-            <label className="label">End Time (optional)</label>
+            <label className="label">Waktu Selesai</label>
             <input className="input" type="datetime-local" value={evForm.end_time} onChange={e=>setEvForm({...evForm, end_time:e.target.value})} />
 
             <hr />
             <div className="small"><b>Set lokasi event:</b> klik peta di kanan</div>
-            <div className="small">Lat/Lng: {Number(evForm.lat).toFixed(5)}, {Number(evForm.lng).toFixed(5)}</div>
+            <div className="small">Koordinat: {Number(evForm.lat).toFixed(5)}, {Number(evForm.lng).toFixed(5)}</div>
 
             <div style={{height:12}} />
-            <button className="btn" onClick={saveEvent}>Simpan</button>
+            <button className="btn" onClick={saveEvent}>💾 Simpan Event</button>
             <button className="btn secondary" style={{marginLeft:8}} onClick={()=>{
               setEvForm({ id:null, name:'', description:'', start_time:'', end_time:'', lat:DEFAULT_CENTER[0], lng:DEFAULT_CENTER[1] })
-            }}>Reset</button>
+            }}>🔄 Reset Form</button>
           </div>
 
           <div className="card" style={{padding:0, overflow:'hidden'}}>
-            {/* center dibuat tetap DEFAULT_CENTER biar map tidak "terkunci" */}
             <MapContainer center={DEFAULT_CENTER} zoom={13} style={{height:'70vh', width:'100%'}}>
               <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <MapPicker onPick={(p)=>setEvForm({...evForm, lat:p.lat, lng:p.lng})} />
 
-              {/* marker lokasi yang sedang diedit */}
               <Marker position={[evForm.lat, evForm.lng]}>
-                <Popup>Lokasi Event (sedang diedit)</Popup>
+                <Popup>📍 Lokasi Event (sedang diedit)</Popup>
               </Marker>
 
-              {/* marker event-event lain */}
               {events.map(e => (
                 <Marker key={e.id} position={[e.lat, e.lng]}>
                   <Popup>
                     <b>{e.name}</b><br/>
-                    {e.start_time ? dayjs(e.start_time).format('DD/MM HH:mm') : ''}<br/>
-                    <button className="btn secondary" onClick={()=>editEvent(e)}>Edit</button>
-                    <button className="btn secondary" onClick={()=>deleteEvent(e.id)} style={{marginLeft:8}}>Hapus</button>
+                    {e.description && <><small>{e.description}</small><br/></>}
+                    {e.start_time ? dayjs(e.start_time).format('DD/MM/YYYY HH:mm') : ''}<br/>
+                    <button className="btn secondary" onClick={()=>editEvent(e)} style={{marginTop:8}}>Edit</button>
+                    <button className="btn secondary" onClick={()=>deleteEvent(e.id)} style={{marginLeft:8, marginTop:8}}>Hapus</button>
                   </Popup>
                 </Marker>
               ))}
@@ -259,13 +321,15 @@ export default function AdminDashboard() {
           </div>
 
           <div className="card" style={{gridColumn:'1 / -1'}}>
-            <h4 style={{marginTop:0}}>Daftar Event</h4>
+            <h4 style={{marginTop:0}}>📋 Daftar Event yang Terdaftar</h4>
             {events.length === 0 && <div className="small">Belum ada event.</div>}
             {events.map(ev => (
-              <div key={ev.id} className="row" style={{justifyContent:'space-between', padding:'8px 0', borderTop:'1px solid #eee'}}>
+              <div key={ev.id} className="row" style={{justifyContent:'space-between', padding:'12px', borderTop:'1px solid #eee', backgroundColor: '#fafafa', marginBottom: '8px', borderRadius: '4px'}}>
                 <div>
                   <b>{ev.name}</b>
-                  <div className="small">{ev.lat.toFixed(5)}, {ev.lng.toFixed(5)}</div>
+                  <div className="small">{ev.description}</div>
+                  <div className="small" style={{color:'#666'}}>📍 {ev.lat.toFixed(5)}, {ev.lng.toFixed(5)}</div>
+                  {ev.start_time && <div className="small" style={{color:'#666'}}>🕐 {dayjs(ev.start_time).format('DD/MM/YYYY HH:mm')}</div>}
                 </div>
                 <div className="row">
                   <button className="btn secondary" onClick={()=>editEvent(ev)}>Edit</button>
@@ -280,47 +344,51 @@ export default function AdminDashboard() {
       {tab === 'closures' && (
         <div className="grid" style={{gridTemplateColumns:'420px 1fr'}}>
           <div className="card">
-            <h4 style={{marginTop:0}}>{clForm.id ? 'Edit Rekayasa' : 'Tambah Rekayasa'}</h4>
+            <h4 style={{marginTop:0}}>{clForm.id ? 'Edit Rekayasa' : 'Tambah Rekayasa Baru'}</h4>
 
-            <label className="label">Terkait Event (optional)</label>
+            <label className="label">Terkait Event</label>
             <select className="input" value={clForm.event_id} onChange={e=>setClForm({...clForm, event_id:e.target.value})}>
-              <option value="">-- none --</option>
+              <option value="">-- Pilih Event (optional) --</option>
               {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
             </select>
 
             <div style={{height:10}} />
-            <label className="label">Tipe</label>
+            <label className="label">Tipe Rekayasa</label>
             <select className="input" value={clForm.type} onChange={e=>setClForm({...clForm, type:e.target.value})}>
-              <option value="CLOSED">CLOSED (Ditutup)</option>
-              <option value="DIVERSION">DIVERSION (Dialihkan)</option>
+              <option value="CLOSED">🚫 CLOSED (Jalan Ditutup)</option>
+              <option value="DIVERSION">🔀 DIVERSION (Dialihkan)</option>
             </select>
 
             <div style={{height:10}} />
-            <label className="label">Alasan</label>
-            <input className="input" value={clForm.reason} onChange={e=>setClForm({...clForm, reason:e.target.value})} placeholder="Kirab pusaka, dll" />
+            <label className="label">Alasan Rekayasa</label>
+            <input className="input" value={clForm.reason} onChange={e=>setClForm({...clForm, reason:e.target.value})} placeholder="Contoh: Kirab pusaka, pembatas jalur, dll" />
 
             <div style={{height:10}} />
-            <label className="label">Mulai (optional)</label>
+            <label className="label">Waktu Mulai</label>
             <input className="input" type="datetime-local" value={clForm.start_time} onChange={e=>setClForm({...clForm, start_time:e.target.value})} />
 
             <div style={{height:10}} />
-            <label className="label">Selesai (optional)</label>
+            <label className="label">Waktu Selesai</label>
             <input className="input" type="datetime-local" value={clForm.end_time} onChange={e=>setClForm({...clForm, end_time:e.target.value})} />
 
             <hr />
-            <div className="small"><b>Pilih ruas:</b> klik 2 titik (A lalu B), lalu Derive.</div>
-            <div className="small">A: {pickA ? `${pickA.lat.toFixed(5)}, ${pickA.lng.toFixed(5)}` : '-'}</div>
-            <div className="small">B: {pickB ? `${pickB.lat.toFixed(5)}, ${pickB.lng.toFixed(5)}` : '-'}</div>
-
-            <div className="row" style={{marginTop:10}}>
-              <button className="btn secondary" onClick={resetPick}>Reset Titik</button>
-              <button className="btn secondary" onClick={deriveEdges}>Derive</button>
+            <div className="small"><b>🗺️ Pilih ruas jalan:</b> klik 2 titik di peta (A lalu B), lalu klik Derive.</div>
+            <div className="small" style={{padding:'8px', backgroundColor:'#f0f0f0', borderRadius:'4px', marginTop:'8px'}}>
+              <b>Titik A:</b> {pickA ? `${pickA.lat.toFixed(5)}, ${pickA.lng.toFixed(5)}` : '(belum dipilih)'}<br/>
+              <b>Titik B:</b> {pickB ? `${pickB.lat.toFixed(5)}, ${pickB.lng.toFixed(5)}` : '(belum dipilih)'}
             </div>
 
-            <div style={{marginTop:10}} className="small">Edges: <b>{derivedEdges.length}</b></div>
+            <div className="row" style={{marginTop:10}}>
+              <button className="btn secondary" onClick={resetPick}>🔄 Reset Titik</button>
+              <button className="btn secondary" onClick={deriveEdges}>🔍 Derive Edges</button>
+            </div>
+
+            <div style={{marginTop:10, padding:'8px', backgroundColor:'#e8f5e9', borderRadius:'4px'}} className="small">
+              <b>Edges terdeteksi:</b> {derivedEdges.length}
+            </div>
 
             <hr />
-            <button className="btn" onClick={saveClosure}>Simpan Rekayasa</button>
+            <button className="btn" onClick={saveClosure}>💾 Simpan Rekayasa</button>
           </div>
 
           <div className="card" style={{padding:0, overflow:'hidden'}}>
@@ -332,12 +400,12 @@ export default function AdminDashboard() {
                 else { setPickA(p); setPickB(null); setDerivedEdges([]) }
               }} />
 
-              {pickA && <Marker position={[pickA.lat, pickA.lng]}><Popup>Titik A</Popup></Marker>}
-              {pickB && <Marker position={[pickB.lat, pickB.lng]}><Popup>Titik B</Popup></Marker>}
+              {pickA && <Marker position={[pickA.lat, pickA.lng]}><Popup>📍 Titik A (awal)</Popup></Marker>}
+              {pickB && <Marker position={[pickB.lat, pickB.lng]}><Popup>📍 Titik B (akhir)</Popup></Marker>}
 
               {derivedEdges.map((e, idx) => (
                 <Polyline key={'d'+idx} positions={e.polyline.map(p=>[p.lat, p.lng])}
-                  pathOptions={{ color: clForm.type==='CLOSED' ? 'red' : 'orange', weight: 6 }} />
+                  pathOptions={{ color: clForm.type==='CLOSED' ? 'red' : 'orange', weight: 6, opacity: 0.8 }} />
               ))}
 
               {closures.flatMap(c => (c.edges || []).map((e, idx) => (
@@ -346,8 +414,8 @@ export default function AdminDashboard() {
                   <Popup>
                     <b>{c.type}</b><br/>
                     {c.reason || '-'}<br/>
-                    <button className="btn secondary" onClick={()=>editClosure(c)}>Edit</button>
-                    <button className="btn secondary" onClick={()=>deleteClosure(c.id)} style={{marginLeft:8}}>Hapus</button>
+                    <button className="btn secondary" onClick={()=>editClosure(c)} style={{marginTop:8}}>Edit</button>
+                    <button className="btn secondary" onClick={()=>deleteClosure(c.id)} style={{marginLeft:8, marginTop:8}}>Hapus</button>
                   </Popup>
                 </Polyline>
               )))}
@@ -355,13 +423,14 @@ export default function AdminDashboard() {
           </div>
 
           <div className="card" style={{gridColumn:'1 / -1'}}>
-            <h4 style={{marginTop:0}}>Histori Rekayasa (CRUD)</h4>
-            {closures.length === 0 && <div className="small">Belum ada rekayasa.</div>}
+            <h4 style={{marginTop:0}}>📋 Histori Rekayasa Lalu Lintas</h4>
+            {closures.length === 0 && <div className="small">Belum ada rekayasa lalu lintas yang terdaftar.</div>}
             {closures.map(c => (
-              <div key={c.id} className="row" style={{justifyContent:'space-between', padding:'8px 0', borderTop:'1px solid #eee'}}>
+              <div key={c.id} className="row" style={{justifyContent:'space-between', padding:'12px', borderTop:'1px solid #eee', backgroundColor: '#fafafa', marginBottom: '8px', borderRadius: '4px'}}>
                 <div>
-                  <b>{c.type}</b> {c.reason ? `- ${c.reason}` : ''}<br/>
-                  <span className="small">Edges: {c.edges?.length || 0}</span>
+                  <b>{c.type === 'CLOSED' ? '🚫' : '🔀'} {c.type}</b> {c.reason ? `- ${c.reason}` : ''}<br/>
+                  <span className="small" style={{color:'#666'}}>🛣️ Edges: {c.edges?.length || 0}</span>
+                  {c.start_time && <span className="small" style={{color:'#666', marginLeft:'12px'}}>🕐 {dayjs(c.start_time).format('DD/MM HH:mm')}</span>}
                 </div>
                 <div className="row">
                   <button className="btn secondary" onClick={()=>editClosure(c)}>Edit</button>
