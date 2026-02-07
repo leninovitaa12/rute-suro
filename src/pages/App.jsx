@@ -20,7 +20,7 @@ export default function App() {
           <div className="container">
             <div className="admin-nav-content">
               <Link to="/" className="admin-brand">
-                <span className="brand-icon">📍</span>
+                {/* <span className="brand-icon">📍</span> */}
                 RUTE SURO
               </Link>
               <div className="admin-nav-right">
@@ -45,7 +45,7 @@ export default function App() {
         <div className="container">
           <div className="navbar-content">
             <Link to="/" className="navbar-brand">
-              <span className="brand-icon">📍</span>
+              {/* <span className="brand-icon">📍</span> */}
               RUTE SURO
             </Link>
 

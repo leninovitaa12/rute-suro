@@ -1,3 +1,6 @@
+import React from 'react'
+import { FaLightbulb, FaMap, FaExclamationTriangle, FaShieldAlt } from 'react-icons/fa'
+
 export default function TentangPage() {
   return (
     <div className="page">
@@ -67,7 +70,10 @@ export default function TentangPage() {
               </div>
 
               <div className="info-box">
-                <h3 className="info-box-title">💡 Kenapa Menggunakan Algoritma A*?</h3>
+                <h3 className="info-box-title">
+                  <FaLightbulb style={{ display: 'inline-block', marginRight: '0.5rem', verticalAlign: 'middle', fontSize: '1.2rem' }} />
+                  Kenapa Menggunakan Algoritma A*?
+                </h3>
                 <p className="info-box-text">
                   Algoritma A* adalah salah satu algoritma pencarian jalur terbaik yang 
                   menggabungkan kecepatan dan akurasi. Algoritma ini menggunakan heuristic 
@@ -83,7 +89,9 @@ export default function TentangPage() {
                 
                 <div className="feature-list">
                   <div className="feature-list-item">
-                    <div className="feature-list-icon">✨</div>
+                    <div className="feature-list-icon">
+                      <FaLightbulb />
+                    </div>
                     <div>
                       <h4 className="feature-list-title">Algoritma A*</h4>
                       <p className="feature-list-text">
@@ -93,7 +101,9 @@ export default function TentangPage() {
                   </div>
 
                   <div className="feature-list-item">
-                    <div className="feature-list-icon">🗺️</div>
+                    <div className="feature-list-icon">
+                      <FaMap />
+                    </div>
                     <div>
                       <h4 className="feature-list-title">Peta Interaktif</h4>
                       <p className="feature-list-text">
@@ -103,7 +113,9 @@ export default function TentangPage() {
                   </div>
 
                   <div className="feature-list-item">
-                    <div className="feature-list-icon">🚦</div>
+                    <div className="feature-list-icon">
+                      <FaExclamationTriangle />
+                    </div>
                     <div>
                       <h4 className="feature-list-title">Real-time Traffic</h4>
                       <p className="feature-list-text">
@@ -113,7 +125,9 @@ export default function TentangPage() {
                   </div>
 
                   <div className="feature-list-item">
-                    <div className="feature-list-icon">🏮</div>
+                    <div className="feature-list-icon">
+                      <FaLightbulb />
+                    </div>
                     <div>
                       <h4 className="feature-list-title">Event Integration</h4>
                       <p className="feature-list-text">
@@ -123,7 +137,9 @@ export default function TentangPage() {
                   </div>
 
                   <div className="feature-list-item">
-                    <div className="feature-list-icon">🔒</div>
+                    <div className="feature-list-icon">
+                      <FaShieldAlt />
+                    </div>
                     <div>
                       <h4 className="feature-list-title">Admin Panel</h4>
                       <p className="feature-list-text">

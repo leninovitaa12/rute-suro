@@ -7,7 +7,7 @@ export default function HomePage() {
       <section className="hero">
         <div className="container">
           <div className="hero-content">
-            <div className="hero-badge">⚡ POWERED BY A* ALGORITHM</div>
+            <div className="hero-badge"> POWERED BY A* ALGORITHM</div>
             <h1 className="hero-title">
               RUTE SURO: Optimasi Jalur Budaya Ponorogo
             </h1>
@@ -18,10 +18,10 @@ export default function HomePage() {
             </p>
             <div className="hero-actions">
               <Link to="/map" className="btn-primary">
-                🎯 Mulai Optimasi
+                Mulai Optimasi
               </Link>
               <Link to="/jadwal" className="btn-secondary">
-                📅 Lihat Jadwal Acara
+                Lihat Jadwal Acara
               </Link>
             </div>
           </div>
@@ -40,7 +40,7 @@ export default function HomePage() {
 
           <div className="features-grid">
             <div className="feature-card">
-              <div className="feature-icon">🎯</div>
+              {/* <div className="feature-icon">🎯</div> */}
               <h3 className="feature-title">Optimasi A*</h3>
               <p className="feature-description">
                 Memanfaatkan data real-time dan algoritma A* untuk menentukan rute 
@@ -50,7 +50,7 @@ export default function HomePage() {
             </div>
 
             <div className="feature-card">
-              <div className="feature-icon">💹</div>
+              {/* <div className="feature-icon">💹</div> */}
               <h3 className="feature-title">Trafik Real-time</h3>
               <p className="feature-description">
                 Integra si data lalu lintas langsung dan pembaruan kondisi jalan secara 
@@ -60,7 +60,7 @@ export default function HomePage() {
             </div>
 
             <div className="feature-card">
-              <div className="feature-icon">🏛️</div>
+              {/* <div className="feature-icon">🏛️</div> */}
               <h3 className="feature-title">Acara Budaya</h3>
               <p className="feature-description">
                 Informasi jadwal dan lokasi lengkap acara Grebeg Suro, kirab pusaka, 
@@ -85,7 +85,7 @@ export default function HomePage() {
           <div className="steps-grid">
             <div className="step-card">
               <div className="step-number">1</div>
-              <div className="step-icon">📍</div>
+              {/* <div className="step-icon">📍</div> */}
               <h3 className="step-title">Pilih Lokasi</h3>
               <p className="step-description">
                 Tentukan titik awal dan tujuan Anda di peta interaktif. Bisa klik langsung 
@@ -95,7 +95,7 @@ export default function HomePage() {
 
             <div className="step-card">
               <div className="step-number">2</div>
-              <div className="step-icon">🗺️</div>
+              {/* <div className="step-icon">🗺️</div> */}
               <h3 className="step-title">Pilih Metode</h3>
               <p className="step-description">
                 Pilih preferensi transportasi Anda: jalan kaki, motor, mobil, atau 
@@ -105,7 +105,7 @@ export default function HomePage() {
 
             <div className="step-card">
               <div className="step-number">3</div>
-              <div className="step-icon">⚡</div>
+              {/* <div className="step-icon">⚡</div> */}
               <h3 className="step-title">Cari Rute Optimal</h3>
               <p className="step-description">
                 Algoritma A* kami menganalisis dan menentukan rute terbaik dengan 
@@ -116,7 +116,7 @@ export default function HomePage() {
 
           <div className="cta-section">
             <Link to="/map" className="btn-primary-large">
-              🚀 Mulai Cari Rute
+               Mulai Cari Rute
             </Link>
           </div>
         </div>
@@ -131,7 +131,12 @@ export default function HomePage() {
 
           <div className="main-features-grid">
             <div className="main-feature-item">
-              <div className="main-feature-icon">🚀</div>
+              <div className="main-feature-icon">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                  <path d="M24 6L28 14H36L30 19L32 27L24 22L16 27L18 19L12 14H20L24 6Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                  <path d="M24 30V42" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
               <h3 className="main-feature-title">Optimasi Route</h3>
               <p className="main-feature-description">
                 Menggunakan data graph dengan algoritma A* untuk menghitung rute 
@@ -141,7 +146,12 @@ export default function HomePage() {
             </div>
 
             <div className="main-feature-item">
-              <div className="main-feature-icon">📊</div>
+              <div className="main-feature-icon">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                  <path d="M12 32V12H16V32M22 32V8H26V32M32 32V18H36V32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M8 36H40" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
               <h3 className="main-feature-title">Real-time Traffic</h3>
               <p className="main-feature-description">
                 Integrasi live traffic updates dan sensor IoT untuk memantau kondisi 
@@ -150,7 +160,14 @@ export default function HomePage() {
             </div>
 
             <div className="main-feature-item">
-              <div className="main-feature-icon">🏮</div>
+              <div className="main-feature-icon">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                  <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="2"/>
+                  <path d="M24 12V24L32 32" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M8 24H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <path d="M40 24H32" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
               <h3 className="main-feature-title">Road Closures</h3>
               <p className="main-feature-description">
                 Informasi dan manajemen penutupan jalan akibat kirab atau event khusus. 
@@ -159,7 +176,14 @@ export default function HomePage() {
             </div>
 
             <div className="main-feature-item">
-              <div className="main-feature-icon">📅</div>
+              <div className="main-feature-icon">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                  <path d="M12 8H36C37.1 8 38 8.9 38 10V40C38 41.1 37.1 42 36 42H12C10.9 42 10 41.1 10 40V10C10 8.9 10.9 8 12 8Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                  <path d="M14 12H34V20H14Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                  <line x1="18" y1="26" x2="30" y2="26" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <line x1="18" y1="32" x2="30" y2="32" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
               <h3 className="main-feature-title">Event Schedules</h3>
               <p className="main-feature-description">
                 Kalender lengkap jadwal acara Grebeg Suro. Dapatkan notifikasi dan 
@@ -180,7 +204,7 @@ export default function HomePage() {
               seluruh lokasi acara budaya di Ponorogo.
             </p>
             <Link to="/map" className="btn-cta">
-              ⚡ Cari Rute Sekarang
+               Cari Rute Sekarang
             </Link>
           </div>
         </div>
