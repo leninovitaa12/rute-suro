@@ -1,68 +1,132 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+@layer base {
+  * {
+    @apply box-border;
   }
-  a:hover {
-    color: #747bff;
+  
+  body {
+    @apply bg-secondary text-text-primary;
   }
+  
+  a {
+    @apply text-inherit no-underline;
+  }
+  
   button {
-    background-color: #f9f9f9;
+    @apply transition-all duration-300;
+  }
+  
+  hr {
+    @apply border-0 border-t border-border my-4;
+  }
+}
+
+@layer components {
+  .container {
+    @apply max-w-5xl mx-auto px-4;
+  }
+  
+  .page {
+    @apply min-h-[calc(100vh-200px)];
+  }
+  
+  /* Buttons */
+  .btn {
+    @apply bg-primary text-white px-4 py-2.5 rounded-lg cursor-pointer font-semibold transition-all duration-300 text-sm border-0 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn:hover:not(:disabled) {
+    @apply bg-primary-dark;
+  }
+  
+  .btn.secondary {
+    @apply bg-white text-text-primary border border-border;
+  }
+  
+  .btn.secondary:hover {
+    @apply bg-secondary;
+  }
+  
+  .btn-primary {
+    @apply inline-block px-7 py-3.5 bg-white text-primary rounded-lg font-bold text-base transition-all duration-300 relative overflow-hidden no-underline;
+  }
+  
+  .btn-primary:hover {
+    @apply -translate-y-0.75 shadow-2xl;
+  }
+  
+  .btn-secondary {
+    @apply inline-block px-7 py-3.5 bg-transparent text-white border-2 border-white rounded-lg font-bold text-base transition-all duration-300 relative overflow-hidden no-underline;
+  }
+  
+  .btn-secondary:hover {
+    @apply -translate-y-0.75 shadow-3xl;
+  }
+  
+  .btn-primary-large {
+    @apply inline-block px-10 py-4 bg-primary text-white rounded-lg font-bold text-lg transition-all duration-300 relative overflow-hidden no-underline border-0 cursor-pointer;
+  }
+  
+  .btn-primary-large:hover {
+    @apply bg-primary-dark -translate-y-0.75 shadow-xl;
+  }
+  
+  .btn-cta {
+    @apply inline-block px-10 py-4 bg-white text-primary rounded-lg font-bold text-lg transition-all duration-300 relative overflow-hidden no-underline border-0 cursor-pointer;
+  }
+  
+  .btn-cta:hover {
+    @apply -translate-y-0.75 shadow-2xl;
+  }
+  
+  .btn-admin {
+    @apply inline-block px-6 py-2.5 bg-white/20 text-white rounded-md font-semibold transition-all duration-300 border border-white/30 cursor-pointer relative overflow-hidden no-underline;
+  }
+  
+  .btn-admin:hover {
+    @apply bg-white/30 border-white/50 -translate-y-0.5 shadow-xl;
+  }
+  
+  .btn-admin:active {
+    @apply translate-y-0;
+  }
+  
+  /* Cards */
+  .card {
+    @apply bg-white border border-border rounded-2xl p-6;
+  }
+  
+  /* Forms */
+  .input {
+    @apply w-full px-3.5 py-2.5 border border-border rounded-lg text-sm transition-colors duration-200 focus:outline-none focus:border-primary;
+  }
+  
+  .input:focus {
+    @apply border-primary;
+  }
+  
+  .label {
+    @apply text-sm text-text-secondary mb-2 block font-semibold;
+  }
+  
+  /* Grid & Layout */
+  .grid {
+    @apply grid gap-6;
+  }
+  
+  .row {
+    @apply flex gap-3 items-center flex-wrap;
+  }
+  
+  /* Text Utilities */
+  .small {
+    @apply text-sm text-text-secondary;
+  }
+  
+  .badge {
+    @apply inline-block px-3 py-1 rounded-full text-xs bg-red-100 text-error border border-red-300 font-semibold;
   }
 }

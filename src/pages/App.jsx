@@ -15,16 +15,15 @@ export default function App() {
 
   if (isAdminPage) {
     return (
-      <div className="admin-layout">
-        <div className="admin-nav">
+      <div className="min-h-screen bg-secondary">
+        <div className="bg-primary text-white py-4 shadow-md">
           <div className="container">
-            <div className="admin-nav-content">
-              <Link to="/" className="admin-brand">
-                {/* <span className="brand-icon">📍</span> */}
+            <div className="flex items-center justify-between">
+              <Link to="/" className="font-extrabold text-xl text-white flex items-center gap-2">
                 RUTE SURO
               </Link>
-              <div className="admin-nav-right">
-                <span className="admin-badge">Admin Mode</span>
+              <div className="flex items-center gap-4">
+                <span className="px-4 py-2 bg-white/20 rounded-full text-sm font-semibold">Admin Mode</span>
               </div>
             </div>
           </div>
@@ -39,43 +38,47 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div>
       {/* Navigation */}
-      <nav className="navbar">
+      <nav className="sticky top-0 z-50 bg-gradient-to-r from-primary to-primary-dark shadow-lg">
         <div className="container">
-          <div className="navbar-content">
-            <Link to="/" className="navbar-brand">
-              {/* <span className="brand-icon">📍</span> */}
+          <div className="flex items-center justify-between py-4 gap-8">
+            <Link to="/" className="font-extrabold text-xl text-white flex items-center gap-2 whitespace-nowrap hover:translate-y-[-2px] transition-transform duration-300">
               RUTE SURO
             </Link>
 
             {/* Desktop Menu */}
-            <div className="navbar-menu desktop-menu">
-              <Link to="/" className={location.pathname === '/' ? 'nav-link active' : 'nav-link'}>
+            <div className="hidden md:flex gap-0 justify-center flex-1">
+              <Link to="/" className={`px-6 py-3 font-medium text-white/80 relative transition-all duration-300 hover:text-white group ${location.pathname === '/' ? 'text-white' : ''}`}>
                 Home
+                <span className={`absolute bottom-0 left-1/2 h-0.75 bg-white transition-all duration-300 transform -translate-x-1/2 ${location.pathname === '/' ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
               </Link>
-              <Link to="/map" className={location.pathname === '/map' ? 'nav-link active' : 'nav-link'}>
+              <Link to="/map" className={`px-6 py-3 font-medium text-white/80 relative transition-all duration-300 hover:text-white group ${location.pathname === '/map' ? 'text-white' : ''}`}>
                 Map
+                <span className={`absolute bottom-0 left-1/2 h-0.75 bg-white transition-all duration-300 transform -translate-x-1/2 ${location.pathname === '/map' ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
               </Link>
-              <Link to="/tentang" className={location.pathname === '/tentang' ? 'nav-link active' : 'nav-link'}>
+              <Link to="/tentang" className={`px-6 py-3 font-medium text-white/80 relative transition-all duration-300 hover:text-white group ${location.pathname === '/tentang' ? 'text-white' : ''}`}>
                 Tentang
+                <span className={`absolute bottom-0 left-1/2 h-0.75 bg-white transition-all duration-300 transform -translate-x-1/2 ${location.pathname === '/tentang' ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
               </Link>
-              <Link to="/sejarah" className={location.pathname === '/sejarah' ? 'nav-link active' : 'nav-link'}>
+              <Link to="/sejarah" className={`px-6 py-3 font-medium text-white/80 relative transition-all duration-300 hover:text-white group ${location.pathname === '/sejarah' ? 'text-white' : ''}`}>
                 Sejarah
+                <span className={`absolute bottom-0 left-1/2 h-0.75 bg-white transition-all duration-300 transform -translate-x-1/2 ${location.pathname === '/sejarah' ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
               </Link>
-              <Link to="/jadwal" className={location.pathname === '/jadwal' ? 'nav-link active' : 'nav-link'}>
+              <Link to="/jadwal" className={`px-6 py-3 font-medium text-white/80 relative transition-all duration-300 hover:text-white group ${location.pathname === '/jadwal' ? 'text-white' : ''}`}>
                 Jadwal
+                <span className={`absolute bottom-0 left-1/2 h-0.75 bg-white transition-all duration-300 transform -translate-x-1/2 ${location.pathname === '/jadwal' ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
               </Link>
             </div>
 
-            <div className="navbar-actions">
-              <Link to="/admin" className="btn-admin">
+            <div className="flex items-center gap-4">
+              <Link to="/admin" className="btn-admin hidden md:inline-block">
                 Admin Login
               </Link>
               
               {/* Mobile Menu Button */}
               <button 
-                className="mobile-menu-btn"
+                className="md:hidden flex items-center justify-center w-10 h-10 text-white text-xl transition-transform duration-300 hover:scale-110 active:scale-95"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
                 {mobileMenuOpen ? '✕' : '☰'}
@@ -85,40 +88,45 @@ export default function App() {
 
           {/* Mobile Menu */}
           {mobileMenuOpen && (
-            <div className="mobile-menu">
+            <div className="fixed top-16 left-0 right-0 bg-gradient-to-b from-primary to-primary-dark flex flex-col py-4 gap-0 shadow-lg md:hidden">
               <Link 
                 to="/" 
-                className={location.pathname === '/' ? 'mobile-nav-link active' : 'mobile-nav-link'}
+                className={`px-4 py-4 text-white/80 transition-all duration-300 font-medium relative ${location.pathname === '/' ? 'text-white bg-white/10' : 'hover:bg-white/10'}`}
                 onClick={() => setMobileMenuOpen(false)}
               >
+                <span className={`absolute left-0 top-0 bottom-0 w-0.75 bg-white transition-all duration-300 ${location.pathname === '/' ? 'block' : ''}`}></span>
                 Home
               </Link>
               <Link 
                 to="/map" 
-                className={location.pathname === '/map' ? 'mobile-nav-link active' : 'mobile-nav-link'}
+                className={`px-4 py-4 text-white/80 transition-all duration-300 font-medium relative ${location.pathname === '/map' ? 'text-white bg-white/10' : 'hover:bg-white/10'}`}
                 onClick={() => setMobileMenuOpen(false)}
               >
+                <span className={`absolute left-0 top-0 bottom-0 w-0.75 bg-white transition-all duration-300 ${location.pathname === '/map' ? 'block' : ''}`}></span>
                 Map
               </Link>
               <Link 
                 to="/tentang" 
-                className={location.pathname === '/tentang' ? 'mobile-nav-link active' : 'mobile-nav-link'}
+                className={`px-4 py-4 text-white/80 transition-all duration-300 font-medium relative ${location.pathname === '/tentang' ? 'text-white bg-white/10' : 'hover:bg-white/10'}`}
                 onClick={() => setMobileMenuOpen(false)}
               >
+                <span className={`absolute left-0 top-0 bottom-0 w-0.75 bg-white transition-all duration-300 ${location.pathname === '/tentang' ? 'block' : ''}`}></span>
                 Tentang
               </Link>
               <Link 
                 to="/sejarah" 
-                className={location.pathname === '/sejarah' ? 'mobile-nav-link active' : 'mobile-nav-link'}
+                className={`px-4 py-4 text-white/80 transition-all duration-300 font-medium relative ${location.pathname === '/sejarah' ? 'text-white bg-white/10' : 'hover:bg-white/10'}`}
                 onClick={() => setMobileMenuOpen(false)}
               >
+                <span className={`absolute left-0 top-0 bottom-0 w-0.75 bg-white transition-all duration-300 ${location.pathname === '/sejarah' ? 'block' : ''}`}></span>
                 Sejarah
               </Link>
               <Link 
                 to="/jadwal" 
-                className={location.pathname === '/jadwal' ? 'mobile-nav-link active' : 'mobile-nav-link'}
+                className={`px-4 py-4 text-white/80 transition-all duration-300 font-medium relative ${location.pathname === '/jadwal' ? 'text-white bg-white/10' : 'hover:bg-white/10'}`}
                 onClick={() => setMobileMenuOpen(false)}
               >
+                <span className={`absolute left-0 top-0 bottom-0 w-0.75 bg-white transition-all duration-300 ${location.pathname === '/jadwal' ? 'block' : ''}`}></span>
                 Jadwal
               </Link>
             </div>
@@ -136,39 +144,39 @@ export default function App() {
       </Routes>
 
       {/* Footer */}
-      <footer className="footer">
+      <footer className="bg-text-primary text-white py-12 mt-16">
         <div className="container">
-          <div className="footer-content">
-            <div className="footer-section">
-              <h4 className="footer-title">RUTE SURO</h4>
-              <p className="footer-text">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+            <div className="flex flex-col gap-3">
+              <h4 className="text-lg font-bold mb-2">RUTE SURO</h4>
+              <p className="opacity-80 text-sm leading-6">
                 Sistem navigasi cerdas untuk optimasi jalur budaya Ponorogo selama Grebeg Suro.
               </p>
             </div>
             
-            <div className="footer-section">
-              <h4 className="footer-title">Link Cepat</h4>
-              <Link to="/" className="footer-link">Home</Link>
-              <Link to="/map" className="footer-link">Map & Route Finder</Link>
-              <Link to="/tentang" className="footer-link">Tentang</Link>
-              <Link to="/jadwal" className="footer-link">Jadwal Acara</Link>
+            <div className="flex flex-col gap-3">
+              <h4 className="text-lg font-bold mb-2">Link Cepat</h4>
+              <Link to="/" className="opacity-80 text-sm hover:opacity-100 transition-opacity">Home</Link>
+              <Link to="/map" className="opacity-80 text-sm hover:opacity-100 transition-opacity">Map & Route Finder</Link>
+              <Link to="/tentang" className="opacity-80 text-sm hover:opacity-100 transition-opacity">Tentang</Link>
+              <Link to="/jadwal" className="opacity-80 text-sm hover:opacity-100 transition-opacity">Jadwal Acara</Link>
             </div>
             
-            <div className="footer-section">
-              <h4 className="footer-title">Kontak</h4>
-              <p className="footer-text">Kabupaten Ponorogo</p>
-              <p className="footer-text">Jawa Timur, Indonesia</p>
+            <div className="flex flex-col gap-3">
+              <h4 className="text-lg font-bold mb-2">Kontak</h4>
+              <p className="opacity-80 text-sm">Kabupaten Ponorogo</p>
+              <p className="opacity-80 text-sm">Jawa Timur, Indonesia</p>
             </div>
           </div>
           
-          <div className="footer-bottom">
-            <p>&copy; 2024 Pemerintah Kabupaten Ponorogo. Dashboard Optimasi Rute Suro.</p>
-            <div className="footer-links">
-              <a href="#" className="footer-link-small">Kebijakan Privasi</a>
-              <span className="separator">•</span>
-              <a href="#" className="footer-link-small">Syarat & Ketentuan</a>
-              <span className="separator">•</span>
-              <Link to="/admin" className="footer-link-small">Kontak Kami</Link>
+          <div className="border-t border-white/10 pt-8 text-center">
+            <p className="text-sm opacity-70 mb-3">&copy; 2024 Pemerintah Kabupaten Ponorogo. Dashboard Optimasi Rute Suro.</p>
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <a href="#" className="text-sm opacity-70 hover:opacity-100 transition-opacity">Kebijakan Privasi</a>
+              <span className="opacity-30">•</span>
+              <a href="#" className="text-sm opacity-70 hover:opacity-100 transition-opacity">Syarat & Ketentuan</a>
+              <span className="opacity-30">•</span>
+              <Link to="/admin" className="text-sm opacity-70 hover:opacity-100 transition-opacity">Kontak Kami</Link>
             </div>
           </div>
         </div>

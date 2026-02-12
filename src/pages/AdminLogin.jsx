@@ -31,10 +31,10 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="container" style={{maxWidth: 520, marginTop: '80px'}}>
-      <div className="card">
-        <h3 style={{marginTop:0, textAlign: 'center'}}>Admin Login</h3>
-        <p style={{textAlign: 'center', color: '#666', fontSize: '14px', marginBottom: '20px'}}>
+    <div className="container min-h-screen flex items-center justify-center">
+      <div className="card max-w-md w-full">
+        <h3 className="text-3xl font-bold mt-0 mb-6 text-center">Admin Login</h3>
+        <p className="text-center text-text-secondary text-sm mb-6">
           Demo Credentials:<br/>
           <strong>Email:</strong> admin@rutesuro.com<br/>
           <strong>Password:</strong> admin123
@@ -43,31 +43,29 @@ export default function AdminLogin() {
         <form onSubmit={login}>
           <label className="label">Email</label>
           <input 
-            className="input" 
+            className="input mb-4" 
             type="email"
             value={email} 
             onChange={e=>setEmail(e.target.value)}
             placeholder="admin@rutesuro.com"
             required
           />
-          <div style={{height:10}} />
           
           <label className="label">Password</label>
           <input 
-            className="input" 
+            className="input mb-4" 
             type="password" 
             value={password} 
             onChange={e=>setPassword(e.target.value)}
             placeholder="Masukkan password"
             required
           />
-          <div style={{height:12}} />
           
-          <button className="btn" type="submit" style={{width: '100%'}}>
+          <button className="btn w-full" type="submit">
             Login
           </button>
           
-          {msg && <p className="small" style={{color:'#991b1b', marginTop: '12px', textAlign: 'center'}}>{msg}</p>}
+          {msg && <p className="text-sm text-error mt-3 text-center">{msg}</p>}
         </form>
       </div>
     </div>

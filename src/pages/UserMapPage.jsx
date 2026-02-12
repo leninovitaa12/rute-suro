@@ -74,15 +74,15 @@ export default function UserMapPage() {
   }
 
   return (
-    <div className="container">
-      <div className="grid">
+    <div className="container min-h-screen">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-6">
         <div className="card">
-          <h3 style={{marginTop:0}}>User Route Finder</h3>
-          <div className="small">{msg}</div>
-          <hr />
+          <h3 className="text-2xl font-bold mt-0 mb-4">User Route Finder</h3>
+          <div className="text-sm text-text-secondary mb-4">{msg}</div>
+          <hr className="my-4" />
 
           <label className="label">Pilih Event (opsional)</label>
-          <select className="input" value={selectedEventId} onChange={e => setSelectedEventId(e.target.value)}>
+          <select className="input mb-4" value={selectedEventId} onChange={e => setSelectedEventId(e.target.value)}>
             <option value="">-- pilih event --</option>
             {events.map(ev => (
               <option key={ev.id} value={ev.id}>
@@ -90,34 +90,34 @@ export default function UserMapPage() {
               </option>
             ))}
           </select>
-          <div className="row" style={{marginTop:10}}>
+          <div className="flex gap-3 mb-4">
             <button className="btn secondary" onClick={applyEventAsDestination}>Set tujuan = Event</button>
           </div>
 
-          <hr />
+          <hr className="my-4" />
           <label className="label">Mode klik peta</label>
-          <div className="row">
-            <button className={"btn " + (pickMode==='start' ? '' : 'secondary')} onClick={() => setPickMode('start')}>Set START</button>
-            <button className={"btn " + (pickMode==='end' ? '' : 'secondary')} onClick={() => setPickMode('end')}>Set DEST</button>
+          <div className="flex gap-3 mb-4">
+            <button className={pickMode === 'start' ? 'btn' : 'btn secondary'} onClick={() => setPickMode('start')}>Set START</button>
+            <button className={pickMode === 'end' ? 'btn' : 'btn secondary'} onClick={() => setPickMode('end')}>Set DEST</button>
           </div>
 
-          <div style={{marginTop:12}}>
-            <div className="small">Start: {start ? `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}` : '-'}</div>
-            <div className="small">Dest: {end ? `${end.lat.toFixed(5)}, ${end.lng.toFixed(5)}` : '-'}</div>
+          <div className="my-4">
+            <div className="text-sm text-text-secondary">Start: {start ? `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}` : '-'}</div>
+            <div className="text-sm text-text-secondary">Dest: {end ? `${end.lat.toFixed(5)}, ${end.lng.toFixed(5)}` : '-'}</div>
           </div>
 
-          <hr />
-          <button className="btn" disabled={loading} onClick={findRoute}>
+          <hr className="my-4" />
+          <button className="btn w-full disabled:opacity-50" disabled={loading} onClick={findRoute}>
             {loading ? 'Memproses...' : 'Temukan Rute (A*)'}
           </button>
 
-          <hr />
-          <div className="small">
-            <span className="badge">Merah</span> = jalan ditutup (rekayasa admin)
+          <hr className="my-4" />
+          <div className="text-sm">
+            <span className="inline-block px-3 py-1 rounded-full text-xs bg-red-100 text-error border border-red-300 font-semibold">Merah</span> = jalan ditutup (rekayasa admin)
           </div>
         </div>
 
-        <div className="card" style={{padding:0, overflow:'hidden'}}>
+        <div className="card p-0 overflow-hidden">
           <MapContainer center={DEFAULT_CENTER} zoom={13} style={{height: '78vh', width:'100%'}}>
             <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <ClickSetter mode={pickMode} onPick={onPick} />
