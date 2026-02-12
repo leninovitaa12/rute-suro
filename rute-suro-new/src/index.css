@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@layer components {
+  .container {
+    @apply mx-auto px-4 max-w-7xl;
+  }
+
+  .btn {
+    @apply px-6 py-3 rounded-lg font-semibold transition-all duration-300 cursor-pointer;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary text-white hover:bg-primary-dark active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply btn bg-secondary text-text-primary border border-border hover:bg-gray-100 active:scale-95;
+  }
+
+  .btn-outline {
+    @apply btn border-2 border-primary text-primary hover:bg-primary hover:text-white active:scale-95;
+  }
+
+  .btn-admin {
+    @apply px-4 py-2 bg-primary text-white rounded font-semibold hover:bg-primary-dark transition-colors duration-300;
+  }
+
+  .nav-link {
+    @apply text-white/80 hover:text-white transition-colors duration-300 relative;
+  }
+
+  .nav-link.active {
+    @apply text-white;
+  }
+}
