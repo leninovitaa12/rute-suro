@@ -174,14 +174,9 @@ export default function AdminDashboard({ section = 'traffic' }) {
 
     return (
       <div>
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-text-primary">Rekayasa Lalu Lintas</h1>
-            <p className="text-text-secondary mt-1">Kelola penutupan jalan dan pengalihan rute</p>
-          </div>
-          <button onClick={handleLogout} className="px-6 py-2 bg-red-600 text-white font-medium rounded hover:bg-red-700 transition-all duration-300">
-            Logout
-          </button>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Rekayasa Lalu Lintas</h1>
+          <p className="text-gray-600 mt-1">Kelola penutupan jalan dan pengalihan rute</p>
         </div>
 
         {msg && <div className={`p-4 rounded mb-6 ${msg.includes('dihapus') || msg.includes('tersimpan') ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-red-100 text-red-800 border border-red-300'}`}>
@@ -436,14 +431,9 @@ export default function AdminDashboard({ section = 'traffic' }) {
 
     return (
       <div>
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-text-primary">Manajemen Event</h1>
-            <p className="text-text-secondary mt-1">Tambah dan kelola event Grebeg Suro</p>
-          </div>
-          <button onClick={handleLogout} className="px-6 py-2 bg-red-600 text-white font-medium rounded hover:bg-red-700 transition-all duration-300">
-            Logout
-          </button>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Manajemen Event</h1>
+          <p className="text-gray-600 mt-1">Tambah dan kelola event Grebeg Suro</p>
         </div>
 
         {msg && <div className={`p-4 rounded mb-6 ${msg.includes('dihapus') || msg.includes('tersimpan') ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-red-100 text-red-800 border border-red-300'}`}>

@@ -1,164 +1,123 @@
 import React from 'react'
-import { FaLightbulb, FaMap, FaExclamationTriangle, FaShieldAlt } from 'react-icons/fa'
+import { Link } from 'react-router-dom'
 
 export default function TentangPage() {
   return (
-    <div className="page">
-      <section className="page-header">
-        <div className="container">
-          <h1 className="page-title">Tentang Aplikasi Rute Suro</h1>
-          <p className="page-subtitle">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <section className="bg-red-800 text-white py-12 sm:py-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h1 className="text-4xl sm:text-5xl font-bold mb-4">Tentang Aplikasi Rute Suro</h1>
+          <p className="text-xl text-red-100">
             Solusi teknologi canggih untuk mendukung kelancaran tradisi budaya di Ponorogo
           </p>
         </div>
       </section>
 
-      <section className="content-section">
-        <div className="container">
-          <div className="content-grid">
-            <div className="content-main">
-              <h2 className="content-title">Cara Kerja Singkat</h2>
+      {/* Content */}
+      <section className="py-12 sm:py-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main Content */}
+            <div className="lg:col-span-2">
+              <h2 className="text-3xl font-bold text-gray-900 mb-8">Cara Kerja Singkat</h2>
               
-              <div className="work-steps">
-                <div className="work-step">
-                  <div className="work-step-number">1</div>
-                  <div className="work-step-content">
-                    <h3 className="work-step-title">Pilih Lokasi</h3>
-                    <p className="work-step-description">
-                      Anda dapat menentukan titik awal dan tujuan dengan cara klik langsung 
-                      di peta interaktif atau memilih dari daftar event yang tersedia. 
-                      Sistem akan menandai lokasi Anda dengan marker yang jelas.
-                    </p>
+              <div className="space-y-8">
+                {[
+                  {
+                    num: '1',
+                    title: 'Pilih Lokasi',
+                    desc: 'Anda dapat menentukan titik awal dan tujuan dengan cara klik langsung di peta interaktif atau memilih dari daftar event yang tersedia. Sistem akan menandai lokasi Anda dengan marker yang jelas.'
+                  },
+                  {
+                    num: '2',
+                    title: 'Pilih Metode Transportasi',
+                    desc: 'Tentukan preferensi transportasi Anda: jalan kaki, sepeda motor, mobil, atau transportasi umum. Setiap metode memiliki perhitungan waktu dan rute yang berbeda untuk kenyamanan maksimal.'
+                  },
+                  {
+                    num: '3',
+                    title: 'Sistem Menghitung Rute',
+                    desc: 'Algoritma A* kami menganalisis semua kemungkinan jalur dengan mempertimbangkan jarak, waktu tempuh, kondisi lalu lintas real-time, dan penutupan jalan untuk memberikan rute paling optimal.'
+                  },
+                  {
+                    num: '4',
+                    title: 'Ikuti Panduan Navigasi',
+                    desc: 'Rute ditampilkan dengan jelas di peta beserta estimasi waktu perjalanan. Ikuti panduan step-by-step untuk mencapai tujuan Anda dengan lancar dan efisien.'
+                  }
+                ].map((step) => (
+                  <div key={step.num} className="flex gap-6 group">
+                    <div className="flex-shrink-0">
+                      <div className="flex items-center justify-center h-12 w-12 rounded-lg bg-red-800 text-white font-bold text-lg shadow-md group-hover:shadow-lg transition-all">
+                        {step.num}
+                      </div>
+                    </div>
+                    <div className="flex-1 transform group-hover:translate-x-1 transition-transform duration-300">
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">{step.title}</h3>
+                      <p className="text-gray-600 leading-relaxed">{step.desc}</p>
+                    </div>
                   </div>
-                </div>
-
-                <div className="work-step">
-                  <div className="work-step-number">2</div>
-                  <div className="work-step-content">
-                    <h3 className="work-step-title">Pilih Metode Transportasi</h3>
-                    <p className="work-step-description">
-                      Tentukan preferensi transportasi Anda: jalan kaki, sepeda motor, 
-                      mobil, atau transportasi umum. Setiap metode memiliki perhitungan 
-                      waktu dan rute yang berbeda untuk kenyamanan maksimal.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="work-step">
-                  <div className="work-step-number">3</div>
-                  <div className="work-step-content">
-                    <h3 className="work-step-title">Sistem Menghitung Rute</h3>
-                    <p className="work-step-description">
-                      Algoritma A* kami menganalisis semua kemungkinan jalur dengan 
-                      mempertimbangkan jarak, waktu tempuh, kondisi lalu lintas real-time, 
-                      dan penutupan jalan untuk memberikan rute paling optimal.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="work-step">
-                  <div className="work-step-number">4</div>
-                  <div className="work-step-content">
-                    <h3 className="work-step-title">Ikuti Panduan Navigasi</h3>
-                    <p className="work-step-description">
-                      Rute ditampilkan dengan jelas di peta beserta estimasi waktu perjalanan. 
-                      Ikuti panduan step-by-step untuk mencapai tujuan Anda dengan lancar 
-                      dan efisien.
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
 
-              <div className="info-box">
-                <h3 className="info-box-title">
-                  <FaLightbulb style={{ display: 'inline-block', marginRight: '0.5rem', verticalAlign: 'middle', fontSize: '1.2rem' }} />
-                  Kenapa Menggunakan Algoritma A*?
-                </h3>
-                <p className="info-box-text">
-                  Algoritma A* adalah salah satu algoritma pencarian jalur terbaik yang 
-                  menggabungkan kecepatan dan akurasi. Algoritma ini menggunakan heuristic 
-                  function untuk memprediksi jarak ke tujuan, sehingga dapat menemukan 
-                  rute optimal lebih cepat daripada algoritma tradisional seperti Dijkstra.
+              {/* Info Box */}
+              <div className="mt-12 p-6 bg-blue-50 border-l-4 border-blue-500 rounded-lg transform hover:translate-x-1 transition-transform duration-300">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Kenapa Menggunakan Algoritma A*?</h3>
+                <p className="text-gray-700 leading-relaxed">
+                  Algoritma A* adalah salah satu algoritma pencarian jalur terbaik yang menggabungkan kecepatan dan akurasi. Algoritma ini menggunakan heuristic function untuk memprediksi jarak ke tujuan, sehingga dapat menemukan rute optimal lebih cepat daripada algoritma tradisional seperti Dijkstra.
                 </p>
               </div>
             </div>
 
-            <div className="content-sidebar">
-              <div className="sidebar-card">
-                <h3 className="sidebar-title">Fitur Unggulan</h3>
-                
-                <div className="feature-list">
-                  <div className="feature-list-item">
-                    <div className="feature-list-icon">
-                      <FaLightbulb />
+            {/* Sidebar */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow-lg p-6 mb-6 transform hover:shadow-xl transition-all duration-300">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Fitur Unggulan</h3>
+                <div className="space-y-4">
+                  {[
+                    { 
+                      title: 'Algoritma A*', 
+                      desc: 'Perhitungan rute tercepat dengan akurasi tinggi' 
+                    },
+                    { 
+                      title: 'Peta Interaktif', 
+                      desc: 'Visualisasi real-time dengan tampilan yang intuitif' 
+                    },
+                    { 
+                      title: 'Real-time Traffic', 
+                      desc: 'Informasi lalu lintas langsung dan akurat' 
+                    },
+                    { 
+                      title: 'Event Integration', 
+                      desc: 'Terintegrasi dengan jadwal Grebeg Suro' 
+                    },
+                    { 
+                      title: 'Admin Panel', 
+                      desc: 'Manajemen event dan rekayasa lalu lintas' 
+                    }
+                  ].map((feature, i) => (
+                    <div key={i} className="pb-4 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 p-2 rounded transition-colors">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-red-800 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-white text-sm font-bold">{i + 1}</span>
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900 mb-1">{feature.title}</h4>
+                          <p className="text-sm text-gray-600">{feature.desc}</p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="feature-list-title">Algoritma A*</h4>
-                      <p className="feature-list-text">
-                        Perhitungan rute tercepat dengan akurasi tinggi
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="feature-list-item">
-                    <div className="feature-list-icon">
-                      <FaMap />
-                    </div>
-                    <div>
-                      <h4 className="feature-list-title">Peta Interaktif</h4>
-                      <p className="feature-list-text">
-                        Visualisasi real-time dengan tampilan yang intuitif
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="feature-list-item">
-                    <div className="feature-list-icon">
-                      <FaExclamationTriangle />
-                    </div>
-                    <div>
-                      <h4 className="feature-list-title">Real-time Traffic</h4>
-                      <p className="feature-list-text">
-                        Informasi lalu lintas langsung dan akurat
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="feature-list-item">
-                    <div className="feature-list-icon">
-                      <FaLightbulb />
-                    </div>
-                    <div>
-                      <h4 className="feature-list-title">Event Integration</h4>
-                      <p className="feature-list-text">
-                        Terintegrasi dengan jadwal Grebeg Suro
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="feature-list-item">
-                    <div className="feature-list-icon">
-                      <FaShieldAlt />
-                    </div>
-                    <div>
-                      <h4 className="feature-list-title">Admin Panel</h4>
-                      <p className="feature-list-text">
-                        Manajemen event dan rekayasa lalu lintas
-                      </p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
 
-              <div className="sidebar-card">
-                <h3 className="sidebar-title">Teknologi</h3>
-                <div className="tech-tags">
-                  <span className="tech-tag">React</span>
-                  <span className="tech-tag">Leaflet</span>
-                  <span className="tech-tag">A* Algorithm</span>
-                  <span className="tech-tag">OpenStreetMap</span>
-                  <span className="tech-tag">Real-time Data</span>
-                  <span className="tech-tag">Supabase</span>
+              <div className="bg-white rounded-lg shadow-lg p-6 transform hover:shadow-xl transition-all duration-300">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Teknologi</h3>
+                <div className="flex flex-wrap gap-2">
+                  {['React', 'Leaflet', 'A* Algorithm', 'OpenStreetMap', 'Real-time Data', 'Supabase'].map((tech) => (
+                    <span key={tech} className="px-3 py-1 bg-red-100 text-red-800 text-sm font-medium rounded-full hover:bg-red-200 transition-colors">
+                      {tech}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
@@ -166,64 +125,36 @@ export default function TentangPage() {
         </div>
       </section>
 
-      <section className="faq-section">
-        <div className="container">
-          <h2 className="section-title">Pertanyaan Umum (FAQ)</h2>
-          
-          <div className="faq-grid">
-            <div className="faq-item">
-              <h3 className="faq-question">Apakah data rute akurat?</h3>
-              <p className="faq-answer">
-                Ya, sistem kami menggunakan data dari OpenStreetMap yang terus diperbarui 
-                dan dikombinasikan dengan algoritma A* untuk memberikan rute paling akurat 
-                dan efisien berdasarkan kondisi aktual.
-              </p>
-            </div>
-
-            <div className="faq-item">
-              <h3 className="faq-question">Seberapa akurat estimasi waktu perjalanan?</h3>
-              <p className="faq-answer">
-                Estimasi waktu dihitung berdasarkan jarak, kondisi jalan, dan data traffic 
-                real-time. Akurasi mencapai 85-90% tergantung kondisi lalu lintas yang 
-                dapat berubah sewaktu-waktu.
-              </p>
-            </div>
-
-            <div className="faq-item">
-              <h3 className="faq-question">Apakah sistem dapat menghindari jalan yang ditutup?</h3>
-              <p className="faq-answer">
-                Tentu! Sistem secara otomatis mendeteksi dan menghindari jalan yang ditutup 
-                akibat acara atau rekayasa lalu lintas. Admin dapat mengelola penutupan 
-                jalan melalui dashboard khusus.
-              </p>
-            </div>
-
-            <div className="faq-item">
-              <h3 className="faq-question">Bagaimana cara mengakses info jadwal acara?</h3>
-              <p className="faq-answer">
-                Anda dapat mengakses jadwal lengkap acara Grebeg Suro melalui menu "Jadwal" 
-                di navigasi atas. Informasi mencakup waktu, lokasi, dan detail setiap acara.
-              </p>
-            </div>
-
-            <div className="faq-item">
-              <h3 className="faq-question">Apakah bisa digunakan offline?</h3>
-              <p className="faq-answer">
-                Saat ini aplikasi memerlukan koneksi internet untuk mengakses data peta 
-                dan traffic real-time. Fitur offline sedang dalam pengembangan untuk 
-                versi mendatang.
-              </p>
-            </div>
-
-            <div className="faq-item">
-              <h3 className="faq-question">Siapa yang dapat mengakses Admin Panel?</h3>
-              <p className="faq-answer">
-                Admin Panel hanya dapat diakses oleh petugas berwenang dari Pemerintah 
-                Kabupaten Ponorogo yang memiliki kredensial login khusus untuk mengelola 
-                event dan rekayasa lalu lintas.
-              </p>
-            </div>
+      {/* FAQ */}
+      <section className="bg-white py-12 sm:py-16 border-t border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-12 text-center">Pertanyaan Umum (FAQ)</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {[
+              { q: 'Apakah data rute akurat?', a: 'Ya, sistem kami menggunakan data dari OpenStreetMap yang terus diperbarui dan dikombinasikan dengan algoritma A* untuk memberikan rute paling akurat dan efisien berdasarkan kondisi aktual.' },
+              { q: 'Seberapa akurat estimasi waktu perjalanan?', a: 'Estimasi waktu dihitung berdasarkan jarak, kondisi jalan, dan data traffic real-time. Akurasi mencapai 85-90% tergantung kondisi lalu lintas yang dapat berubah sewaktu-waktu.' },
+              { q: 'Apakah sistem dapat menghindari jalan yang ditutup?', a: 'Tentu! Sistem secara otomatis mendeteksi dan menghindari jalan yang ditutup akibat acara atau rekayasa lalu lintas. Admin dapat mengelola penutupan jalan melalui dashboard khusus.' },
+              { q: 'Bagaimana cara mengakses info jadwal acara?', a: 'Anda dapat mengakses jadwal lengkap acara Grebeg Suro melalui menu "Jadwal" di navigasi atas. Informasi mencakup waktu, lokasi, dan detail setiap acara.' },
+              { q: 'Apakah bisa digunakan offline?', a: 'Saat ini aplikasi memerlukan koneksi internet untuk mengakses data peta dan traffic real-time. Fitur offline sedang dalam pengembangan untuk versi mendatang.' },
+              { q: 'Siapa yang dapat mengakses Admin Panel?', a: 'Admin Panel hanya dapat diakses oleh petugas berwenang dari Pemerintah Kabupaten Ponorogo yang memiliki kredensial login khusus untuk mengelola event dan rekayasa lalu lintas.' }
+            ].map((item, i) => (
+              <div key={i} className="bg-gray-50 p-6 rounded-lg hover:shadow-md transform hover:scale-105 transition-all duration-300">
+                <h3 className="font-semibold text-gray-900 mb-3">{item.q}</h3>
+                <p className="text-gray-600 leading-relaxed">{item.a}</p>
+              </div>
+            ))}
           </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="bg-red-800 text-white py-12 sm:py-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl font-bold mb-4">Siap untuk Memulai?</h2>
+          <p className="text-red-100 mb-8 text-lg">Temukan rute terbaik untuk perjalanan Anda</p>
+          <Link to="/map" className="inline-block px-8 py-3 bg-white text-red-800 font-bold rounded-lg hover:bg-red-50 hover:shadow-lg active:scale-95 transition-all duration-300">
+            Mulai Navigasi
+          </Link>
         </div>
       </section>
     </div>

@@ -1,174 +1,91 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom'
-import { useState } from 'react'
 import HomePage from './HomePage.jsx'
 import UserMapPage from './UserMapPage.jsx'
 import TentangPage from './TentangPage.jsx'
 import SejarahPage from './SejarahPage.jsx'
 import JadwalPage from './JadwalPage.jsx'
-import AdminDashboard from './AdminDashboard.jsx'
+import AdminDashboardTraffic from './AdminDashboardTraffic.jsx'
 import AdminLogin from './AdminLogin.jsx'
+import AdminLayout from '../components/AdminLayout.jsx'
+import { AdminSejarah, AdminJadwal, AdminTentang } from './AdminDashboardContent.jsx'
+import Navbar from '../components/Navbar.jsx'
 
 export default function App() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const location = useLocation()
-  const isAdminPage = location.pathname.startsWith('/admin')
+  const isAdminPath = location.pathname.startsWith('/admin')
 
-  if (isAdminPage) {
-    return (
-      <div className="admin-layout">
-        <div className="admin-nav">
-          <div className="container">
-            <div className="admin-nav-content">
-              <Link to="/" className="admin-brand">
-                {/* <span className="brand-icon">📍</span> */}
-                RUTE SURO
-              </Link>
-              <div className="admin-nav-right">
-                <span className="admin-badge">Admin Mode</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <Routes>
-          <Route path="/admin" element={<AdminLogin />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-        </Routes>
-      </div>
-    )
+  // Admin pages
+  if (isAdminPath) {
+    if (location.pathname === '/admin' || location.pathname === '/admin/') {
+      return <AdminLogin />
+    }
+    if (location.pathname.startsWith('/admin/dashboard')) {
+      const section = location.pathname.split('/')[3] || 'traffic'
+      return (
+        <AdminLayout>
+          {section === 'traffic' && <AdminDashboardTraffic section="traffic" />}
+          {section === 'events' && <AdminDashboardTraffic section="events" />}
+          {section === 'sejarah' && <AdminSejarah />}
+          {section === 'jadwal' && <AdminJadwal />}
+          {section === 'tentang' && <AdminTentang />}
+        </AdminLayout>
+      )
+    }
+    return <AdminLogin />
   }
 
   return (
-    <div className="app">
+    <div className="min-h-screen flex flex-col">
       {/* Navigation */}
-      <nav className="navbar">
-        <div className="container">
-          <div className="navbar-content">
-            <Link to="/" className="navbar-brand">
-              {/* <span className="brand-icon">📍</span> */}
-              RUTE SURO
-            </Link>
+      <Navbar />
 
-            {/* Desktop Menu */}
-            <div className="navbar-menu desktop-menu">
-              <Link to="/" className={location.pathname === '/' ? 'nav-link active' : 'nav-link'}>
-                Home
-              </Link>
-              <Link to="/map" className={location.pathname === '/map' ? 'nav-link active' : 'nav-link'}>
-                Map
-              </Link>
-              <Link to="/tentang" className={location.pathname === '/tentang' ? 'nav-link active' : 'nav-link'}>
-                Tentang
-              </Link>
-              <Link to="/sejarah" className={location.pathname === '/sejarah' ? 'nav-link active' : 'nav-link'}>
-                Sejarah
-              </Link>
-              <Link to="/jadwal" className={location.pathname === '/jadwal' ? 'nav-link active' : 'nav-link'}>
-                Jadwal
-              </Link>
-            </div>
-
-            <div className="navbar-actions">
-              <Link to="/admin" className="btn-admin">
-                Admin Login
-              </Link>
-              
-              {/* Mobile Menu Button */}
-              <button 
-                className="mobile-menu-btn"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              >
-                {mobileMenuOpen ? '✕' : '☰'}
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile Menu */}
-          {mobileMenuOpen && (
-            <div className="mobile-menu">
-              <Link 
-                to="/" 
-                className={location.pathname === '/' ? 'mobile-nav-link active' : 'mobile-nav-link'}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Home
-              </Link>
-              <Link 
-                to="/map" 
-                className={location.pathname === '/map' ? 'mobile-nav-link active' : 'mobile-nav-link'}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Map
-              </Link>
-              <Link 
-                to="/tentang" 
-                className={location.pathname === '/tentang' ? 'mobile-nav-link active' : 'mobile-nav-link'}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Tentang
-              </Link>
-              <Link 
-                to="/sejarah" 
-                className={location.pathname === '/sejarah' ? 'mobile-nav-link active' : 'mobile-nav-link'}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Sejarah
-              </Link>
-              <Link 
-                to="/jadwal" 
-                className={location.pathname === '/jadwal' ? 'mobile-nav-link active' : 'mobile-nav-link'}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Jadwal
-              </Link>
-            </div>
-          )}
-        </div>
-      </nav>
-
-      {/* Routes */}
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/map" element={<UserMapPage />} />
-        <Route path="/tentang" element={<TentangPage />} />
-        <Route path="/sejarah" element={<SejarahPage />} />
-        <Route path="/jadwal" element={<JadwalPage />} />
-      </Routes>
+      {/* Main Content */}
+      <main className="flex-1">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/map" element={<UserMapPage />} />
+          <Route path="/tentang" element={<TentangPage />} />
+          <Route path="/sejarah" element={<SejarahPage />} />
+          <Route path="/jadwal" element={<JadwalPage />} />
+        </Routes>
+      </main>
 
       {/* Footer */}
-      <footer className="footer">
-        <div className="container">
-          <div className="footer-content">
-            <div className="footer-section">
-              <h4 className="footer-title">RUTE SURO</h4>
-              <p className="footer-text">
+      <footer style={{background: '#1a1a1a', color: '#fff', padding: '30px 20px'}}>
+        <div style={{maxWidth: '1400px', margin: '0 auto'}}>
+          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '30px', marginBottom: '30px'}}>
+            <div>
+              <h4 style={{fontSize: '18px', fontWeight: 'bold', marginBottom: '10px'}}>RUTE SURO</h4>
+              <p style={{color: '#aaa', fontSize: '14px', lineHeight: '1.6'}}>
                 Sistem navigasi cerdas untuk optimasi jalur budaya Ponorogo selama Grebeg Suro.
               </p>
             </div>
             
-            <div className="footer-section">
-              <h4 className="footer-title">Link Cepat</h4>
-              <Link to="/" className="footer-link">Home</Link>
-              <Link to="/map" className="footer-link">Map & Route Finder</Link>
-              <Link to="/tentang" className="footer-link">Tentang</Link>
-              <Link to="/jadwal" className="footer-link">Jadwal Acara</Link>
+            <div>
+              <h4 style={{fontSize: '18px', fontWeight: 'bold', marginBottom: '15px'}}>Link Cepat</h4>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '8px', color: '#aaa', fontSize: '14px'}}>
+                <Link to="/" style={{color: '#aaa', textDecoration: 'none'}} onMouseOver={e => e.target.style.color = '#fff'} onMouseOut={e => e.target.style.color = '#aaa'}>Home</Link>
+                <Link to="/map" style={{color: '#aaa', textDecoration: 'none'}} onMouseOver={e => e.target.style.color = '#fff'} onMouseOut={e => e.target.style.color = '#aaa'}>Map & Route Finder</Link>
+                <Link to="/tentang" style={{color: '#aaa', textDecoration: 'none'}} onMouseOver={e => e.target.style.color = '#fff'} onMouseOut={e => e.target.style.color = '#aaa'}>Tentang</Link>
+                <Link to="/jadwal" style={{color: '#aaa', textDecoration: 'none'}} onMouseOver={e => e.target.style.color = '#fff'} onMouseOut={e => e.target.style.color = '#aaa'}>Jadwal Acara</Link>
+              </div>
             </div>
             
-            <div className="footer-section">
-              <h4 className="footer-title">Kontak</h4>
-              <p className="footer-text">Kabupaten Ponorogo</p>
-              <p className="footer-text">Jawa Timur, Indonesia</p>
+            <div>
+              <h4 style={{fontSize: '18px', fontWeight: 'bold', marginBottom: '15px'}}>Kontak</h4>
+              <p style={{color: '#aaa', fontSize: '14px'}}>Kabupaten Ponorogo</p>
+              <p style={{color: '#aaa', fontSize: '14px'}}>Jawa Timur, Indonesia</p>
             </div>
           </div>
           
-          <div className="footer-bottom">
-            <p>&copy; 2024 Pemerintah Kabupaten Ponorogo. Dashboard Optimasi Rute Suro.</p>
-            <div className="footer-links">
-              <a href="#" className="footer-link-small">Kebijakan Privasi</a>
-              <span className="separator">•</span>
-              <a href="#" className="footer-link-small">Syarat & Ketentuan</a>
-              <span className="separator">•</span>
-              <Link to="/admin" className="footer-link-small">Kontak Kami</Link>
+          <div style={{borderTop: '1px solid #333', paddingTop: '20px'}}>
+            <p style={{color: '#666', fontSize: '13px', textAlign: 'center', marginBottom: '15px'}}>&copy; 2024 Pemerintah Kabupaten Ponorogo. Dashboard Optimasi Rute Suro.</p>
+            <div style={{display: 'flex', justifyContent: 'center', gap: '15px', color: '#666', fontSize: '13px'}}>
+              <a href="#" style={{color: '#666', textDecoration: 'none'}} onMouseOver={e => e.target.style.color = '#aaa'} onMouseOut={e => e.target.style.color = '#666'}>Kebijakan Privasi</a>
+              <span>•</span>
+              <a href="#" style={{color: '#666', textDecoration: 'none'}} onMouseOver={e => e.target.style.color = '#aaa'} onMouseOut={e => e.target.style.color = '#666'}>Syarat & Ketentuan</a>
+              <span>•</span>
+              <Link to="/admin" style={{color: '#666', textDecoration: 'none'}} onMouseOver={e => e.target.style.color = '#aaa'} onMouseOut={e => e.target.style.color = '#666'}>Kontak Kami</Link>
             </div>
           </div>
         </div>

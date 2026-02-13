@@ -1,102 +1,86 @@
-'use client';
-
-import { useState } from 'react';
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
 
 export default function Navbar() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-  };
-
-  const closeMenu = () => {
-    setIsMenuOpen(false);
-  };
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   return (
-    <nav className="navbar">
-      <div className="container">
-        <div className="navbar-content">
+    <nav className="sticky top-0 z-50 bg-red-800 text-white shadow-lg">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
           {/* Brand */}
-          <a href="/" className="navbar-brand" onClick={closeMenu}>
-            <span className="brand-icon">RUTE</span>
-            <span>SURO</span>
-          </a>
+          <Link 
+            to="/" 
+            onClick={() => setIsMenuOpen(false)}
+            className="font-black text-2xl text-white hover:text-red-100 transition-colors"
+          >
+            RUTE SURO
+          </Link>
 
           {/* Desktop Menu */}
-          <div className="navbar-menu">
-            <div className="desktop-menu">
-              <a href="#" className="nav-link active">
-                Home
-              </a>
-              <a href="#map" className="nav-link">
-                Map
-              </a>
-              <a href="#about" className="nav-link">
-                Tentang
-              </a>
-              <a href="#schedule" className="nav-link">
-                Jadwal
-              </a>
-            </div>
+          <div className="hidden md:flex items-center gap-8">
+            <Link to="/" className="text-white font-medium hover:text-red-100 transition-colors duration-300">
+              Home
+            </Link>
+            <Link to="/map" className="text-white font-medium hover:text-red-100 transition-colors duration-300">
+              Map
+            </Link>
+            <Link to="/tentang" className="text-white font-medium hover:text-red-100 transition-colors duration-300">
+              Tentang
+            </Link>
+            <Link to="/sejarah" className="text-white font-medium hover:text-red-100 transition-colors duration-300">
+              Sejarah
+            </Link>
+            <Link to="/jadwal" className="text-white font-medium hover:text-red-100 transition-colors duration-300">
+              Jadwal
+            </Link>
           </div>
 
           {/* Actions */}
-          <div className="navbar-actions">
-            <a href="#admin" className="btn-admin">
-              Admin Login
-            </a>
-
-            {/* Mobile Menu Toggle */}
-            <button
-              className="mobile-menu-btn"
-              onClick={toggleMenu}
-              aria-label="Toggle navigation menu"
+          <div className="flex items-center gap-4">
+            <Link 
+              to="/admin" 
+              className="hidden md:block px-6 py-2 border-2 border-white text-white font-medium rounded hover:bg-white hover:text-red-800 transition-all duration-300"
             >
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                {isMenuOpen ? (
-                  <>
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </>
-                ) : (
-                  <>
-                    <line x1="3" y1="6" x2="21" y2="6" />
-                    <line x1="3" y1="12" x2="21" y2="12" />
-                    <line x1="3" y1="18" x2="21" y2="18" />
-                  </>
-                )}
-              </svg>
+              Admin Login
+            </Link>
+
+            <button
+              className="md:hidden text-white text-3xl p-2 hover:text-red-100 transition-colors"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label="Toggle menu"
+            >
+              {isMenuOpen ? '✕' : '☰'}
             </button>
           </div>
         </div>
 
         {/* Mobile Menu */}
-        <div className={`mobile-menu ${isMenuOpen ? 'active' : ''}`}>
-          <a href="#" className="mobile-nav-link active" onClick={closeMenu}>
-            Home
-          </a>
-          <a href="#map" className="mobile-nav-link" onClick={closeMenu}>
-            Map
-          </a>
-          <a href="#about" className="mobile-nav-link" onClick={closeMenu}>
-            Tentang
-          </a>
-          <a href="#schedule" className="mobile-nav-link" onClick={closeMenu}>
-            Jadwal
-          </a>
-          <a href="#admin" className="mobile-nav-link" onClick={closeMenu}>
-            Admin Login
-          </a>
-        </div>
+        {isMenuOpen && (
+          <div className="md:hidden border-t border-red-700 bg-red-900">
+            <div className="px-4 py-4 space-y-2">
+              <Link to="/" className="block px-4 py-3 text-white hover:bg-red-700 rounded transition-colors" onClick={() => setIsMenuOpen(false)}>
+                Home
+              </Link>
+              <Link to="/map" className="block px-4 py-3 text-white hover:bg-red-700 rounded transition-colors" onClick={() => setIsMenuOpen(false)}>
+                Map
+              </Link>
+              <Link to="/tentang" className="block px-4 py-3 text-white hover:bg-red-700 rounded transition-colors" onClick={() => setIsMenuOpen(false)}>
+                Tentang
+              </Link>
+              <Link to="/sejarah" className="block px-4 py-3 text-white hover:bg-red-700 rounded transition-colors" onClick={() => setIsMenuOpen(false)}>
+                Sejarah
+              </Link>
+              <Link to="/jadwal" className="block px-4 py-3 text-white hover:bg-red-700 rounded transition-colors" onClick={() => setIsMenuOpen(false)}>
+                Jadwal
+              </Link>
+              <Link to="/admin" className="block px-4 py-3 text-white border-2 border-white rounded hover:bg-white hover:text-red-800 transition-all" onClick={() => setIsMenuOpen(false)}>
+                Admin Login
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </nav>
-  );
+  )
 }
