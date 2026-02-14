@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../lib/api.js'
+import { api } from '../../lib/api.js'
 import dayjs from 'dayjs'
 
 export default function JadwalPage() {

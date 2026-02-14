@@ -1,3 +1,9 @@
+# Keamanan (PENTING)
+.env
+.env.local
+.env.production
+.env.development
+
 # Logs
 logs
 *.log

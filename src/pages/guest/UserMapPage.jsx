@@ -2,7 +2,7 @@ import React from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import dayjs from 'dayjs'
-import { api } from '../lib/api.js'
+import { api } from '../../lib/api.js'
 
 const DEFAULT_CENTER = [-7.871, 111.462]
 

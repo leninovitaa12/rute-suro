@@ -1,13 +1,15 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom'
-import HomePage from './HomePage.jsx'
-import UserMapPage from './UserMapPage.jsx'
-import TentangPage from './TentangPage.jsx'
-import SejarahPage from './SejarahPage.jsx'
-import JadwalPage from './JadwalPage.jsx'
-import AdminDashboardTraffic from './AdminDashboardTraffic.jsx'
-import AdminLogin from './AdminLogin.jsx'
+import HomePage from './guest/HomePage.jsx'
+import UserMapPage from './guest/UserMapPage.jsx'
+import TentangPage from './guest/TentangPage.jsx'
+import SejarahPage from './guest/SejarahPage.jsx'
+import JadwalPage from './guest/JadwalPage.jsx'
+import AdminDashboard from './admin/AdminDashboard.jsx'
+import AdminTraffic from './admin/AdminTraffic.jsx'
+import AdminEvent from './admin/AdminEvent.jsx'
+import AdminLogin from './admin/AdminLogin.jsx'
 import AdminLayout from '../components/AdminLayout.jsx'
-import { AdminSejarah, AdminJadwal, AdminTentang } from './AdminDashboardContent.jsx'
+import { AdminSejarah, AdminJadwal, AdminTentang } from './admin/AdminDashboardContent.jsx'
 import Navbar from '../components/Navbar.jsx'
 
 export default function App() {
@@ -20,11 +22,12 @@ export default function App() {
       return <AdminLogin />
     }
     if (location.pathname.startsWith('/admin/dashboard')) {
-      const section = location.pathname.split('/')[3] || 'traffic'
+      const section = location.pathname.split('/')[3]
       return (
         <AdminLayout>
-          {section === 'traffic' && <AdminDashboardTraffic section="traffic" />}
-          {section === 'events' && <AdminDashboardTraffic section="events" />}
+          {(!section || section === '') && <AdminDashboard />}
+          {section === 'traffic' && <AdminTraffic />}
+          {section === 'events' && <AdminEvent />}
           {section === 'sejarah' && <AdminSejarah />}
           {section === 'jadwal' && <AdminJadwal />}
           {section === 'tentang' && <AdminTentang />}
