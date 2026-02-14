@@ -1,8 +1,16 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
+import { 
+  getClosures, 
+  getEvents, 
+  deriveEdges, 
+  createClosure, 
+  updateClosure, 
+  deleteClosure 
+} from '../../lib/backendApi'
 
 const DEFAULT_CENTER = [-7.871, 111.462]
 
@@ -73,9 +81,37 @@ function MapPicker({ onPick }) {
 
 export default function AdminTraffic() {
   const navigate = useNavigate()
-  const [closures, setClosures] = useState([...mockClosuresData])
+  const [closures, setClosures] = useState([])
+  const [events, setEvents] = useState([])
   const [msg, setMsg] = useState('')
-  const [events] = useState([...mockEventsData])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  // Load closures and events from backend on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        const [closuresData, eventsData] = await Promise.all([
+          getClosures(false),
+          getEvents()
+        ])
+        setClosures(closuresData || [])
+        setEvents(eventsData || [])
+        setError(null)
+      } catch (err) {
+        console.error('[AdminTraffic] Error loading data:', err)
+        setError('Gagal memuat data dari backend')
+        // Fallback to mock data if backend is unavailable
+        setClosures([...mockClosuresData])
+        setEvents([...mockEventsData])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [])
   
   const [clForm, setClForm] = useState({
     id: null,
@@ -96,27 +132,35 @@ export default function AdminTraffic() {
     setDerivedEdges([])
   }
 
-  const deriveEdges = () => {
+  const deriveEdgesFromBackend = async () => {
     if (!pickA || !pickB) return setMsg('Klik 2 titik di peta untuk menentukan ruas (A lalu B).')
-    setMsg('Mengambil edge (demo mode)...')
-    const mockEdges = [{
-      polyline: [
-        { lat: pickA.lat, lng: pickA.lng },
-        { lat: (pickA.lat + pickB.lat) / 2, lng: (pickA.lng + pickB.lng) / 2 },
-        { lat: pickB.lat, lng: pickB.lng }
-      ]
-    }]
-    setDerivedEdges(mockEdges)
-    setMsg(`Edges didapat: ${mockEdges.length} (demo mode). Klik Simpan Rekayasa.`)
+    
+    try {
+      setMsg('Mengambil edge dari backend...')
+      const edges = await deriveEdges(pickA.lat, pickA.lng, pickB.lat, pickB.lng)
+      setDerivedEdges(edges || [])
+      setMsg(`Edges didapat: ${(edges || []).length}. Klik Simpan Rekayasa.`)
+    } catch (err) {
+      console.error('[AdminTraffic] Error deriving edges:', err)
+      setMsg('Error: Gagal mengambil edge dari backend')
+      // Fallback to mock edges
+      const mockEdges = [{
+        polyline: [
+          { lat: pickA.lat, lng: pickA.lng },
+          { lat: (pickA.lat + pickB.lat) / 2, lng: (pickA.lng + pickB.lng) / 2 },
+          { lat: pickB.lat, lng: pickB.lng }
+        ]
+      }]
+      setDerivedEdges(mockEdges)
+    }
   }
 
-  const saveClosure = () => {
+  const saveClosure = async () => {
     setMsg('')
     if (!derivedEdges.length) return setMsg('Edges kosong. Klik 2 titik lalu Derive dulu.')
 
     const payload = {
-      id: clForm.id ?? Date.now(),
-      event_id: clForm.event_id || null,
+      event_id: clForm.event_id ? parseInt(clForm.event_id) : null,
       type: clForm.type,
       reason: clForm.reason || null,
       start_time: toIsoOrNull(clForm.start_time),
@@ -125,15 +169,25 @@ export default function AdminTraffic() {
       created_at: new Date().toISOString()
     }
 
-    if (clForm.id) {
-      setClosures(closures.map(c => c.id === clForm.id ? payload : c))
-    } else {
-      setClosures([payload, ...closures])
+    try {
+      if (clForm.id) {
+        // Update existing closure
+        const updated = await updateClosure(clForm.id, payload)
+        setClosures(closures.map(c => c.id === clForm.id ? updated : c))
+        setMsg('Rekayasa diperbarui.')
+      } else {
+        // Create new closure
+        const created = await createClosure(payload)
+        setClosures([created, ...closures])
+        setMsg('Rekayasa tersimpan.')
+      }
+    } catch (err) {
+      console.error('[AdminTraffic] Error saving closure:', err)
+      setMsg('Error: Gagal menyimpan rekayasa ke backend')
     }
 
     setClForm({ id: null, event_id: '', type: 'CLOSED', reason: '', start_time: '', end_time: '' })
     resetPick()
-    setMsg('Rekayasa tersimpan (demo mode).')
   }
 
   const editClosure = (c) => {
@@ -148,10 +202,17 @@ export default function AdminTraffic() {
     setDerivedEdges(c.edges || [])
   }
 
-  const deleteClosure = (id) => {
+  const deleteClosureHandler = async (id) => {
     if (!confirm('Hapus rekayasa?')) return
-    setClosures(closures.filter(c => c.id !== id))
-    setMsg('Rekayasa dihapus (demo mode).')
+    
+    try {
+      await deleteClosure(id)
+      setClosures(closures.filter(c => c.id !== id))
+      setMsg('Rekayasa dihapus.')
+    } catch (err) {
+      console.error('[AdminTraffic] Error deleting closure:', err)
+      setMsg('Error: Gagal menghapus rekayasa dari backend')
+    }
   }
 
   return (
@@ -251,7 +312,7 @@ export default function AdminTraffic() {
                   Reset
                 </button>
                 <button 
-                  onClick={deriveEdges}
+                  onClick={deriveEdgesFromBackend}
                   className="flex-1 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-all text-sm font-medium"
                 >
                   Derive
@@ -303,7 +364,7 @@ export default function AdminTraffic() {
                     Edit
                   </button>
                   <button 
-                    onClick={() => deleteClosure(c.id)}
+                    onClick={() => deleteClosureHandler(c.id)}
                     className="ml-2 px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-all"
                   >
                     Hapus
@@ -338,7 +399,7 @@ export default function AdminTraffic() {
                       Edit
                     </button>
                     <button 
-                      onClick={() => deleteClosure(c.id)}
+                      onClick={() => deleteClosureHandler(c.id)}
                       className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-all"
                     >
                       Hapus

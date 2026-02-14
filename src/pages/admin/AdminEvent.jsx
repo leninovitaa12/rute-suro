@@ -1,6 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
+import { 
+  getEvents, 
+  createEvent, 
+  updateEvent, 
+  deleteEvent 
+} from '../../lib/backendApi'
 
 const DEFAULT_CENTER = [-7.871, 111.462]
 
@@ -34,6 +40,14 @@ const mockEventsData = [
   }
 ]
 
+// ✅ helper ISO (tanpa mengubah tampilan)
+function toIsoOrNull(dtLocal) {
+  if (!dtLocal) return null
+  const d = new Date(dtLocal)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toISOString()
+}
+
 function MapPicker({ onPick }) {
   useMapEvents({
     click(e) {
@@ -44,10 +58,12 @@ function MapPicker({ onPick }) {
 }
 
 export default function AdminEvent() {
-  const [events, setEvents] = useState([...mockEventsData])
+  const [events, setEvents] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [markerPos, setMarkerPos] = useState({ lat: DEFAULT_CENTER[0], lng: DEFAULT_CENTER[1] })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -58,19 +74,35 @@ export default function AdminEvent() {
     lng: DEFAULT_CENTER[1]
   })
 
-  const handleFormChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
-  }
+  // Load events from backend on mount
+  useEffect(() => {
+    const loadEvents = async () => {
+      try {
+        setLoading(true)
+        const eventsData = await getEvents()
+        setEvents(eventsData || [])
+        setError(null)
+      } catch (err) {
+        console.error('[AdminEvent] Error loading events:', err)
+        setError('Gagal memuat events dari backend')
+        // Fallback to mock data
+        setEvents(mockEventsData)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadEvents()
+  }, [])
 
-  const handleMapClick = (pos) => {
-    setMarkerPos(pos)
-    setFormData({ ...formData, lat: pos.lat, lng: pos.lng })
+  const handleFormChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
   }
 
   const handleAddClick = () => {
     setEditingId(null)
-    setMarkerPos({ lat: DEFAULT_CENTER[0], lng: DEFAULT_CENTER[1] })
     setFormData({ name: '', description: '', location: '', start_time: '', end_time: '', lat: DEFAULT_CENTER[0], lng: DEFAULT_CENTER[1] })
+    setMarkerPos({ lat: DEFAULT_CENTER[0], lng: DEFAULT_CENTER[1] })
     setShowForm(true)
   }
 
@@ -89,27 +121,52 @@ export default function AdminEvent() {
     setShowForm(true)
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.name || !formData.start_time) {
       alert('Nama event dan waktu mulai wajib diisi!')
       return
     }
 
-    if (editingId) {
-      setEvents(events.map(ev => ev.id === editingId ? { ...formData, id: editingId, lat: parseFloat(formData.lat), lng: parseFloat(formData.lng) } : ev))
-    } else {
-      setEvents([...events, { ...formData, id: Date.now(), lat: parseFloat(formData.lat), lng: parseFloat(formData.lng) }])
-    }
+    try {
+      // ✅ FIX: konversi time -> ISO, biar Supabase timestamptz aman
+      const payload = {
+        name: formData.name,
+        description: formData.description || null,
+        location: formData.location || null,
+        start_time: toIsoOrNull(formData.start_time),
+        end_time: toIsoOrNull(formData.end_time),
+        lat: parseFloat(formData.lat),
+        lng: parseFloat(formData.lng)
+      }
 
-    setShowForm(false)
-    setFormData({ name: '', description: '', location: '', start_time: '', end_time: '', lat: DEFAULT_CENTER[0], lng: DEFAULT_CENTER[1] })
-    setMarkerPos({ lat: DEFAULT_CENTER[0], lng: DEFAULT_CENTER[1] })
+      if (editingId) {
+        const updated = await updateEvent(editingId, payload)
+        setEvents(events.map(ev => ev.id === editingId ? updated : ev))
+      } else {
+        const created = await createEvent(payload)
+        setEvents([...events, created])
+      }
+
+      setShowForm(false)
+      setFormData({ name: '', description: '', location: '', start_time: '', end_time: '', lat: DEFAULT_CENTER[0], lng: DEFAULT_CENTER[1] })
+      setMarkerPos({ lat: DEFAULT_CENTER[0], lng: DEFAULT_CENTER[1] })
+    } catch (err) {
+      console.error('[AdminEvent] Error saving event:', err)
+      // ✅ error lebih jelas tanpa ubah layout
+      alert('Error: ' + (err?.message || 'Gagal menyimpan event ke backend'))
+    }
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (confirm('Hapus event ini?')) {
-      setEvents(events.filter(ev => ev.id !== id))
+      try {
+        await deleteEvent(id)
+        setEvents(events.filter(ev => ev.id !== id))
+      } catch (err) {
+        console.error('[AdminEvent] Error deleting event:', err)
+        alert('Error: ' + (err?.message || 'Gagal menghapus event dari backend'))
+      }
     }
   }
 
@@ -147,7 +204,7 @@ export default function AdminEvent() {
 
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Deskripsi</label>
-                  <textarea name="description" value={formData.description} onChange={handleFormChange} placeholder="Deskripsi event" rows="3" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                  <textarea name="description" value={formData.description} onChange={handleFormChange} placeholder="Deskripsi event" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" rows="3" />
                 </div>
 
                 <div>
@@ -167,27 +224,39 @@ export default function AdminEvent() {
 
                 <div className="bg-blue-50 p-3 rounded border border-blue-200">
                   <p className="text-xs text-blue-900 font-bold">📍 Koordinat Lokasi</p>
-                  <p className="text-xs text-blue-800 mt-1"><b>Lat:</b> {markerPos.lat.toFixed(5)}</p>
-                  <p className="text-xs text-blue-800"><b>Lng:</b> {markerPos.lng.toFixed(5)}</p>
-                  <p className="text-xs text-blue-800 mt-2">Klik di peta untuk mengubah lokasi</p>
+                  <p className="text-xs text-blue-800">Lat: {markerPos.lat.toFixed(5)}</p>
+                  <p className="text-xs text-blue-800">Lng: {markerPos.lng.toFixed(5)}</p>
+                  <p className="text-xs text-blue-600 mt-1">Klik di peta untuk mengubah lokasi</p>
                 </div>
 
-                <div className="flex gap-3 justify-end">
-                  <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => setShowForm(false)} className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition-all">
                     Batal
                   </button>
-                  <button type="submit" onClick={handleSubmit} className="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700">
+                  <button type="submit" onClick={handleSubmit} className="flex-1 px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-all">
                     Simpan Event
                   </button>
                 </div>
               </div>
 
               {/* Map Section */}
-              <div className="lg:col-span-2 bg-gray-50 rounded-lg overflow-hidden border border-gray-200">
-                <MapContainer center={[markerPos.lat, markerPos.lng]} zoom={13} style={{ height: '400px', width: '100%' }}>
-                  <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  <MapPicker onPick={handleMapClick} />
-                  {markerPos && <Marker position={[markerPos.lat, markerPos.lng]}><Popup>📍 Lokasi Event</Popup></Marker>}
+              <div className="lg:col-span-2">
+                <MapContainer center={[markerPos.lat, markerPos.lng]} zoom={14} className="h-96 w-full rounded-lg border border-gray-200">
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution="&copy; OpenStreetMap contributors"
+                  />
+                  <MapPicker onPick={(pos) => {
+                    setMarkerPos(pos)
+                    setFormData(prev => ({ ...prev, lat: pos.lat, lng: pos.lng }))
+                  }} />
+                  <Marker position={[markerPos.lat, markerPos.lng]}>
+                    <Popup>
+                      Lokasi Event<br />
+                      Lat: {markerPos.lat.toFixed(5)}<br />
+                      Lng: {markerPos.lng.toFixed(5)}
+                    </Popup>
+                  </Marker>
                 </MapContainer>
               </div>
             </div>
@@ -195,44 +264,44 @@ export default function AdminEvent() {
         </div>
       )}
 
-      {/* Events Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
+      {loading ? (
+        <div className="text-gray-600">Loading...</div>
+      ) : error ? (
+        <div className="text-red-600 font-bold">{error}</div>
+      ) : (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
           <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-4 text-left text-sm font-bold text-gray-900">Nama Event</th>
-                <th className="px-6 py-4 text-left text-sm font-bold text-gray-900">Lokasi</th>
-                <th className="px-6 py-4 text-left text-sm font-bold text-gray-900">Waktu Mulai</th>
-                <th className="px-6 py-4 text-left text-sm font-bold text-gray-900">Aksi</th>
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Nama Event</th>
+                <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Lokasi</th>
+                <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Waktu Mulai</th>
+                <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {events.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-gray-500">Belum ada event. Tambahkan yang baru untuk memulai.</td>
+            <tbody>
+              {events.map(ev => (
+                <tr key={ev.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="px-6 py-4 font-medium text-gray-900">{ev.name}</td>
+                  <td className="px-6 py-4 text-gray-700">{ev.location || '-'}</td>
+                  <td className="px-6 py-4 text-gray-700">{ev.start_time ? ev.start_time.replace('T', ' ').slice(0, 16) : '-'}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex gap-2">
+                      <button onClick={() => handleEditClick(ev)} className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-bold">Edit</button>
+                      <button onClick={() => handleDelete(ev.id)} className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-bold">Hapus</button>
+                    </div>
+                  </td>
                 </tr>
-              ) : (
-                events.map(event => (
-                  <tr key={event.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{event.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{event.location || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{new Date(event.start_time).toLocaleDateString('id-ID')}</td>
-                    <td className="px-6 py-4 text-sm space-x-2 flex">
-                      <button onClick={() => handleEditClick(event)} className="px-3 py-1 bg-blue-50 text-blue-600 rounded font-bold hover:bg-blue-100">
-                        Edit
-                      </button>
-                      <button onClick={() => handleDelete(event.id)} className="px-3 py-1 bg-red-50 text-red-600 rounded font-bold hover:bg-red-100">
-                        Hapus
-                      </button>
-                    </td>
-                  </tr>
-                ))
+              ))}
+              {events.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-6 text-center text-gray-500">Belum ada event.</td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
+      )}
     </div>
   )
 }
