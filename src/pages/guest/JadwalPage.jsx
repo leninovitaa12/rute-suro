@@ -51,9 +51,9 @@ export default function JadwalPage() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-6 py-2 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 ${
+                className={`px-6 py-2 rounded-lg font-medium btn-primary-hover ${
                   filter === f
-                    ? 'bg-red-800 text-white shadow-lg'
+                    ? 'btn-red'
                     : 'bg-white text-gray-700 border-2 border-gray-300 hover:border-red-800 hover:text-red-800'
                 }`}
               >
@@ -119,7 +119,7 @@ export default function JadwalPage() {
 
                       <Link
                         to={`/map?eventId=${event.id}`}
-                        className="w-full block text-center px-4 py-2 bg-red-800 text-white font-medium rounded-lg hover:bg-red-700 hover:shadow-lg active:scale-95 transition-all duration-300"
+                        className="w-full block text-center px-4 py-2 btn-red rounded-lg"
                       >
                         Lihat di Map
                       </Link>
@@ -183,7 +183,7 @@ export default function JadwalPage() {
                         <span className="text-sm">{event.location}</span>
                       </div>
                     </div>
-                    <button className="w-full bg-red-800 text-white font-semibold py-2 rounded-lg hover:bg-red-700 hover:shadow-lg active:scale-95 transition-all duration-300">
+                    <button className="w-full btn-red rounded-lg py-2 font-semibold">
                       Pilih Event sebagai Tujuan
                     </button>
                   </div>
@@ -202,7 +202,7 @@ export default function JadwalPage() {
             <p className="text-red-100 mb-8 text-lg max-w-3xl mx-auto leading-relaxed">
               Selama acara Grebeg Suro berlangsung, beberapa ruas jalan akan ditutup atau dialihkan. Gunakan aplikasi Rute Suro untuk menemukan jalur alternatif dan menghindari kemacetan.
             </p>
-            <Link to="/map" className="inline-block px-8 py-3 bg-white text-red-800 font-bold rounded-lg hover:bg-red-50 hover:shadow-lg active:scale-95 transition-all duration-300">
+            <Link to="/map" className="inline-block px-8 py-3 bg-white text-red-800 font-bold rounded-lg btn-primary-hover hover:bg-red-50 hover:shadow-lg">
               Cek Rute Alternatif
             </Link>
           </div>

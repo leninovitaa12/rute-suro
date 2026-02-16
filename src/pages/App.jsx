@@ -1,4 +1,5 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import HomePage from './guest/HomePage.jsx'
 import UserMapPage from './guest/UserMapPage.jsx'
 import TentangPage from './guest/TentangPage.jsx'
@@ -15,6 +16,11 @@ import Navbar from '../components/Navbar.jsx'
 export default function App() {
   const location = useLocation()
   const isAdminPath = location.pathname.startsWith('/admin')
+
+  // Scroll to top on route change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [location.pathname])
 
   // Admin pages
   if (isAdminPath) {

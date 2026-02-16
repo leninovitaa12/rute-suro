@@ -152,7 +152,7 @@ export default function TentangPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold mb-4">Siap untuk Memulai?</h2>
           <p className="text-red-100 mb-8 text-lg">Temukan rute terbaik untuk perjalanan Anda</p>
-          <Link to="/map" className="inline-block px-8 py-3 bg-white text-red-800 font-bold rounded-lg hover:bg-red-50 hover:shadow-lg active:scale-95 transition-all duration-300">
+          <Link to="/map" className="inline-block px-8 py-3 bg-white text-red-800 font-bold rounded-lg btn-primary-hover hover:bg-red-50 hover:shadow-lg">
             Mulai Navigasi
           </Link>
         </div>

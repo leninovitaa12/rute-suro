@@ -132,14 +132,13 @@ export default function Navbar() {
           <div className="flex items-center gap-4">
             <Link 
               to="/admin" 
-              className="hidden md:block px-6 py-2 border-2 border-white text-white font-medium rounded hover:bg-white hover:text-red-800 hover:shadow-lg hover:-translate-y-0.5 hover:shadow-red-400/50 transition-all duration-300 relative overflow-hidden group"
+              className="hidden md:block px-6 py-2 btn-red-outline rounded font-medium"
             >
-              <span className="absolute inset-0 bg-white transform scale-x-0 origin-left group-hover:scale-x-100 transition-transform duration-300 -z-10"></span>
               Admin Login
             </Link>
 
             <button
-              className="md:hidden text-white text-3xl p-2 hover:text-red-100 transition-all duration-300 hover:scale-110 hover:rotate-90"
+              className="md:hidden text-white text-3xl p-2 hover:text-red-100 transition-all duration-300 hover:scale-110 active:scale-95"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-label="Toggle menu"
             >
@@ -167,7 +166,7 @@ export default function Navbar() {
               <Link to="/jadwal" className="menu-item block px-4 py-3 text-white hover:bg-red-700 rounded transition-all duration-300 hover:translate-x-2 hover:shadow-lg" onClick={() => setIsMenuOpen(false)}>
                 Jadwal
               </Link>
-              <Link to="/admin" className="menu-item block px-4 py-3 text-white border-2 border-white rounded hover:bg-white hover:text-red-800 transition-all duration-300 hover:translate-x-2" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/admin" className="menu-item block px-4 py-3 btn-red-outline rounded btn-primary-hover hover:translate-x-2" onClick={() => setIsMenuOpen(false)}>
                 Admin Login
               </Link>
             </div>

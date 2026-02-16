@@ -28,6 +28,27 @@
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  /* Button Hover Consistency */
+  .btn-primary-hover {
+    @apply transition-all duration-300 active:scale-95;
+  }
+
+  .btn-red {
+    @apply bg-red-800 text-white btn-primary-hover hover:bg-red-700 hover:shadow-lg;
+  }
+
+  .btn-red-outline {
+    @apply border-2 border-white text-white btn-primary-hover hover:bg-white hover:text-red-800 hover:shadow-lg;
+  }
+
+  .btn-gray-outline {
+    @apply bg-gray-100 text-gray-700 btn-primary-hover hover:bg-gray-200;
+  }
+
+  .btn-red-light {
+    @apply bg-red-100 text-red-800 btn-primary-hover hover:bg-red-200;
+  }
+
   /* Button ripple effect */
   .btn-ripple::before {
     content: '';

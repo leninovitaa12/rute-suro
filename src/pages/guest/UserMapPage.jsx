@@ -74,22 +74,44 @@ export default function UserMapPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-screen lg:h-auto">
+    <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row pt-16 lg:pt-0">
+      {/* Mobile/Tablet Tabs */}
+      <style>{`
+        @media (max-width: 1023px) {
+          .map-container { height: 500px; min-height: 500px; }
+          .panel-container { max-height: 400px; overflow-y-auto; }
+        }
+        @media (min-width: 1024px) {
+          .map-container { height: 100vh; }
+          .panel-container { height: 100vh; overflow-y-auto; }
+        }
+        .tab-button {
+          transition: all 0.3s ease;
+          padding: 0.75rem 1.5rem;
+          font-weight: 600;
+          border-bottom: 3px solid transparent;
+        }
+        .tab-button.active {
+          border-bottom-color: #991b1b;
+          color: #991b1b;
+        }
+      `}</style>
+
+      <div className="w-full lg:grid lg:grid-cols-3 lg:gap-0 flex flex-col">
         {/* Left Panel */}
-        <div className="lg:col-span-1 bg-white shadow-lg p-6 overflow-y-auto">
-          <h3 className="text-2xl font-bold text-gray-900 mb-2">Route Finder</h3>
-          <p className="text-sm text-gray-600 mb-6">{msg}</p>
+        <div className="lg:col-span-1 bg-white lg:shadow-lg p-4 md:p-6 panel-container lg:h-screen lg:overflow-y-auto">
+          <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Route Finder</h3>
+          <p className="text-xs md:text-sm text-gray-600 mb-4 md:mb-6">{msg}</p>
           
-          <hr className="my-4 border-gray-200" />
+          <hr className="my-3 md:my-4 border-gray-200" />
 
           {/* Event Selector */}
-          <div className="mb-6">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Pilih Event (Opsional)</label>
+          <div className="mb-4 md:mb-6">
+            <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2">Pilih Event (Opsional)</label>
             <select 
               value={selectedEventId} 
               onChange={e => setSelectedEventId(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-800 transition-all"
+              className="w-full px-3 md:px-4 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-red-800 transition-all"
             >
               <option value="">-- pilih event --</option>
               {events.map(ev => (
@@ -100,34 +122,34 @@ export default function UserMapPage() {
             </select>
             <button 
               onClick={applyEventAsDestination}
-              className="w-full mt-3 px-4 py-2 bg-red-100 text-red-800 font-medium rounded-lg hover:bg-red-200 transition-colors"
+              className="w-full mt-2 md:mt-3 px-3 md:px-4 py-2 btn-red-light rounded-lg text-sm"
             >
               Set Tujuan = Event
             </button>
           </div>
 
-          <hr className="my-4 border-gray-200" />
+          <hr className="my-3 md:my-4 border-gray-200" />
 
           {/* Mode Selector */}
-          <div className="mb-6">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">Mode Klik Peta</label>
+          <div className="mb-4 md:mb-6">
+            <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-2 md:mb-3">Mode Klik Peta</label>
             <div className="flex gap-2">
               <button 
                 onClick={() => setPickMode('start')}
-                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+                className={`flex-1 px-3 md:px-4 py-2 rounded-lg font-medium text-sm ${
                   pickMode === 'start'
-                    ? 'bg-red-800 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'btn-red shadow-md'
+                    : 'btn-gray-outline'
                 }`}
               >
                 Set START
               </button>
               <button 
                 onClick={() => setPickMode('end')}
-                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+                className={`flex-1 px-3 md:px-4 py-2 rounded-lg font-medium text-sm ${
                   pickMode === 'end'
-                    ? 'bg-red-800 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'btn-red shadow-md'
+                    : 'btn-gray-outline'
                 }`}
               >
                 Set DEST
@@ -136,70 +158,95 @@ export default function UserMapPage() {
           </div>
 
           {/* Coordinates Display */}
-          <div className="mb-6 bg-gray-50 p-4 rounded-lg">
+          <div className="mb-4 md:mb-6 bg-gray-50 p-3 md:p-4 rounded-lg">
             <div className="mb-3">
               <p className="text-xs font-semibold text-gray-600 uppercase">Start Point</p>
-              <p className="text-sm text-gray-900 font-mono">
+              <p className="text-xs md:text-sm text-gray-900 font-mono break-all">
                 {start ? `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}` : '-'}
               </p>
             </div>
             <div>
               <p className="text-xs font-semibold text-gray-600 uppercase">Destination</p>
-              <p className="text-sm text-gray-900 font-mono">
+              <p className="text-xs md:text-sm text-gray-900 font-mono break-all">
                 {end ? `${end.lat.toFixed(5)}, ${end.lng.toFixed(5)}` : '-'}
               </p>
             </div>
           </div>
 
-          <hr className="my-4 border-gray-200" />
+          <hr className="my-3 md:my-4 border-gray-200" />
 
           {/* Find Route Button */}
           <button 
             onClick={findRoute}
             disabled={loading}
-            className={`w-full px-4 py-3 font-bold text-white rounded-lg transition-all ${
+            className={`w-full px-3 md:px-4 py-2 md:py-3 font-bold text-white text-sm md:text-base rounded-lg transition-all ${
               loading
                 ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-red-800 hover:bg-red-700 hover:shadow-lg active:scale-95'
+                : 'btn-red'
             }`}
           >
             {loading ? 'Menghitung Rute...' : 'Temukan Rute (A*)'}
           </button>
 
-          <hr className="my-4 border-gray-200" />
+          <hr className="my-3 md:my-4 border-gray-200" />
 
           {/* Legend */}
           <div className="text-xs text-gray-600 bg-orange-50 p-3 rounded-lg border border-orange-200">
             <p className="font-semibold text-orange-900 mb-2">Informasi Peta</p>
             <p className="flex items-center gap-2">
-              <span className="inline-block w-4 h-4 bg-red-500 rounded"></span>
-              Jalan ditutup (rekayasa)
+              <span className="inline-block w-3 h-3 bg-red-500 rounded flex-shrink-0"></span>
+              <span>Jalan ditutup (rekayasa)</span>
             </p>
           </div>
         </div>
 
         {/* Map Panel */}
-        <div className="lg:col-span-2 bg-white shadow-lg overflow-hidden">
-          <MapContainer center={DEFAULT_CENTER} zoom={13} style={{height: '100%', width:'100%'}}>
-            <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <ClickSetter mode={pickMode} onPick={onPick} />
+        <div className="lg:col-span-2 bg-white lg:shadow-lg overflow-hidden map-container">
+          {start && end ? (
+            <MapContainer center={DEFAULT_CENTER} zoom={13} style={{height: '100%', width:'100%'}}>
+              <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <ClickSetter mode={pickMode} onPick={onPick} />
 
-            {start && <Marker position={[start.lat, start.lng]}><Popup>Start</Popup></Marker>}
-            {end && <Marker position={[end.lat, end.lng]}><Popup>Destination</Popup></Marker>}
+              {start && <Marker position={[start.lat, start.lng]}><Popup>Start</Popup></Marker>}
+              {end && <Marker position={[end.lat, end.lng]}><Popup>Destination</Popup></Marker>}
 
-            {closures.flatMap(c => (c.edges || []).map((e, idx) => (
-              <Polyline key={c.id + '_' + idx} positions={e.polyline.map(p => [p.lat, p.lng])} pathOptions={{ color: 'red', weight: 6 }}>
-                <Popup>
-                  <b>Ditutup</b><br/>
-                  {c.reason || '-'}
-                </Popup>
-              </Polyline>
-            )))}
+              {closures.flatMap(c => (c.edges || []).map((e, idx) => (
+                <Polyline key={c.id + '_' + idx} positions={e.polyline.map(p => [p.lat, p.lng])} pathOptions={{ color: 'red', weight: 6 }}>
+                  <Popup>
+                    <b>Ditutup</b><br/>
+                    {c.reason || '-'}
+                  </Popup>
+                </Polyline>
+              )))}
 
-            {route?.polyline && (
-              <Polyline positions={route.polyline.map(p => [p.lat, p.lng])} pathOptions={{ color: '#111', weight: 5 }} />
-            )}
-          </MapContainer>
+              {route?.polyline && (
+                <Polyline positions={route.polyline.map(p => [p.lat, p.lng])} pathOptions={{ color: '#111', weight: 5 }} />
+              )}
+            </MapContainer>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gray-50">
+              <MapContainer center={DEFAULT_CENTER} zoom={13} style={{height: '100%', width:'100%'}}>
+                <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <ClickSetter mode={pickMode} onPick={onPick} />
+
+                {start && <Marker position={[start.lat, start.lng]}><Popup>Start</Popup></Marker>}
+                {end && <Marker position={[end.lat, end.lng]}><Popup>Destination</Popup></Marker>}
+
+                {closures.flatMap(c => (c.edges || []).map((e, idx) => (
+                  <Polyline key={c.id + '_' + idx} positions={e.polyline.map(p => [p.lat, p.lng])} pathOptions={{ color: 'red', weight: 6 }}>
+                    <Popup>
+                      <b>Ditutup</b><br/>
+                      {c.reason || '-'}
+                    </Popup>
+                  </Polyline>
+                )))}
+
+                {route?.polyline && (
+                  <Polyline positions={route.polyline.map(p => [p.lat, p.lng])} pathOptions={{ color: '#111', weight: 5 }} />
+                )}
+              </MapContainer>
+            </div>
+          )}
         </div>
       </div>
     </div>

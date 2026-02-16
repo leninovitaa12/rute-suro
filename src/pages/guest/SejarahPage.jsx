@@ -117,7 +117,7 @@ export default function SejarahPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Ingin Melihat Jadwal Lengkap?</h2>
           <p className="text-gray-600 mb-8 text-lg">Temukan semua jadwal acara Grebeg Suro dan rencanakan kunjungan Anda</p>
-          <Link to="/jadwal" className="inline-block px-8 py-3 bg-red-800 text-white font-bold rounded-lg hover:bg-red-700 hover:shadow-lg active:scale-95 transition-all duration-300">
+          <Link to="/jadwal" className="inline-block px-8 py-3 btn-red rounded-lg">
             Lihat Jadwal Event
           </Link>
         </div>
