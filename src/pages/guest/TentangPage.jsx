@@ -1,7 +1,29 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { getTentang } from '../../lib/backendApi'
 
 export default function TentangPage() {
+  const [tentangItems, setTentangItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    loadTentang()
+  }, [])
+
+  const loadTentang = async () => {
+    try {
+      setLoading(true)
+      const data = await getTentang()
+      setTentangItems(data)
+    } catch (err) {
+      console.error('[v0] Error loading tentang:', err)
+      setError('Gagal memuat data tentang')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -17,111 +39,108 @@ export default function TentangPage() {
       {/* Content */}
       <section className="py-12 sm:py-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-2">
-              <h2 className="text-3xl font-bold text-gray-900 mb-8">Cara Kerja Singkat</h2>
-              
-              <div className="space-y-8">
-                {[
-                  {
-                    num: '1',
-                    title: 'Pilih Lokasi',
-                    desc: 'Anda dapat menentukan titik awal dan tujuan dengan cara klik langsung di peta interaktif atau memilih dari daftar event yang tersedia. Sistem akan menandai lokasi Anda dengan marker yang jelas.'
-                  },
-                  {
-                    num: '2',
-                    title: 'Pilih Metode Transportasi',
-                    desc: 'Tentukan preferensi transportasi Anda: jalan kaki, sepeda motor, mobil, atau transportasi umum. Setiap metode memiliki perhitungan waktu dan rute yang berbeda untuk kenyamanan maksimal.'
-                  },
-                  {
-                    num: '3',
-                    title: 'Sistem Menghitung Rute',
-                    desc: 'Algoritma A* kami menganalisis semua kemungkinan jalur dengan mempertimbangkan jarak, waktu tempuh, kondisi lalu lintas real-time, dan penutupan jalan untuk memberikan rute paling optimal.'
-                  },
-                  {
-                    num: '4',
-                    title: 'Ikuti Panduan Navigasi',
-                    desc: 'Rute ditampilkan dengan jelas di peta beserta estimasi waktu perjalanan. Ikuti panduan step-by-step untuk mencapai tujuan Anda dengan lancar dan efisien.'
-                  }
-                ].map((step) => (
-                  <div key={step.num} className="flex gap-6 group">
-                    <div className="flex-shrink-0">
-                      <div className="flex items-center justify-center h-12 w-12 rounded-lg bg-red-800 text-white font-bold text-lg shadow-md group-hover:shadow-lg transition-all">
-                        {step.num}
-                      </div>
-                    </div>
-                    <div className="flex-1 transform group-hover:translate-x-1 transition-transform duration-300">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">{step.title}</h3>
-                      <p className="text-gray-600 leading-relaxed">{step.desc}</p>
-                    </div>
+          {loading ? (
+            <div className="text-center py-12">
+              <p className="text-gray-600 text-lg">Memuat data tentang...</p>
+            </div>
+          ) : error ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-12 text-center">
+              <p className="text-red-600 font-medium">{error}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Main Content */}
+              <div className="lg:col-span-2">
+                <h2 className="text-3xl font-bold text-gray-900 mb-8">Konten Tentang Aplikasi</h2>
+                
+                {tentangItems.length === 0 ? (
+                  <div className="bg-gray-100 border border-gray-300 rounded-lg p-6 text-center">
+                    <p className="text-gray-600">Belum ada konten tentang</p>
                   </div>
-                ))}
-              </div>
-
-              {/* Info Box */}
-              <div className="mt-12 p-6 bg-blue-50 border-l-4 border-blue-500 rounded-lg transform hover:translate-x-1 transition-transform duration-300">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Kenapa Menggunakan Algoritma A*?</h3>
-                <p className="text-gray-700 leading-relaxed">
-                  Algoritma A* adalah salah satu algoritma pencarian jalur terbaik yang menggabungkan kecepatan dan akurasi. Algoritma ini menggunakan heuristic function untuk memprediksi jarak ke tujuan, sehingga dapat menemukan rute optimal lebih cepat daripada algoritma tradisional seperti Dijkstra.
-                </p>
-              </div>
-            </div>
-
-            {/* Sidebar */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow-lg p-6 mb-6 transform hover:shadow-xl transition-all duration-300">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Fitur Unggulan</h3>
-                <div className="space-y-4">
-                  {[
-                    { 
-                      title: 'Algoritma A*', 
-                      desc: 'Perhitungan rute tercepat dengan akurasi tinggi' 
-                    },
-                    { 
-                      title: 'Peta Interaktif', 
-                      desc: 'Visualisasi real-time dengan tampilan yang intuitif' 
-                    },
-                    { 
-                      title: 'Real-time Traffic', 
-                      desc: 'Informasi lalu lintas langsung dan akurat' 
-                    },
-                    { 
-                      title: 'Event Integration', 
-                      desc: 'Terintegrasi dengan jadwal Grebeg Suro' 
-                    },
-                    { 
-                      title: 'Admin Panel', 
-                      desc: 'Manajemen event dan rekayasa lalu lintas' 
-                    }
-                  ].map((feature, i) => (
-                    <div key={i} className="pb-4 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 p-2 rounded transition-colors">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 bg-red-800 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="text-white text-sm font-bold">{i + 1}</span>
+                ) : (
+                  <div className="space-y-8">
+                    {tentangItems.map((step) => (
+                      <div key={step.id} className="flex gap-6 group">
+                        <div className="flex-shrink-0">
+                          <div className="flex items-center justify-center h-12 w-12 rounded-lg bg-red-800 text-white font-bold text-lg shadow-md group-hover:shadow-lg transition-all">
+                            {tentangItems.indexOf(step) + 1}
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900 mb-1">{feature.title}</h4>
-                          <p className="text-sm text-gray-600">{feature.desc}</p>
+                        <div className="flex-1 transform group-hover:translate-x-1 transition-transform duration-300">
+                          <h3 className="text-xl font-semibold text-gray-900 mb-2">{step.title}</h3>
+                          <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{step.description}</p>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Info Box */}
+                {tentangItems.length > 0 && (
+                  <div className="mt-12 p-6 bg-blue-50 border-l-4 border-blue-500 rounded-lg transform hover:translate-x-1 transition-transform duration-300">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Informasi Tambahan</h3>
+                    <p className="text-gray-700 leading-relaxed">
+                      Aplikasi Rute Suro dirancang khusus untuk memudahkan pengunjung Grebeg Suro menemukan rute terbaik dengan teknologi navigasi terkini dan algoritma pencarian jalur yang efisien.
+                    </p>
+                  </div>
+                )}
               </div>
 
-              <div className="bg-white rounded-lg shadow-lg p-6 transform hover:shadow-xl transition-all duration-300">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Teknologi</h3>
-                <div className="flex flex-wrap gap-2">
-                  {['React', 'Leaflet', 'A* Algorithm', 'OpenStreetMap', 'Real-time Data', 'Supabase'].map((tech) => (
-                    <span key={tech} className="px-3 py-1 bg-red-100 text-red-800 text-sm font-medium rounded-full hover:bg-red-200 transition-colors">
-                      {tech}
-                    </span>
-                  ))}
+              {/* Sidebar */}
+              <div className="lg:col-span-1">
+                <div className="bg-white rounded-lg shadow-lg p-6 mb-6 transform hover:shadow-xl transition-all duration-300">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">Fitur Unggulan</h3>
+                  <div className="space-y-4">
+                    {[
+                      { 
+                        title: 'Algoritma A*', 
+                        desc: 'Perhitungan rute tercepat dengan akurasi tinggi' 
+                      },
+                      { 
+                        title: 'Peta Interaktif', 
+                        desc: 'Visualisasi real-time dengan tampilan yang intuitif' 
+                      },
+                      { 
+                        title: 'Real-time Traffic', 
+                        desc: 'Informasi lalu lintas langsung dan akurat' 
+                      },
+                      { 
+                        title: 'Event Integration', 
+                        desc: 'Terintegrasi dengan jadwal Grebeg Suro' 
+                      },
+                      { 
+                        title: 'Admin Panel', 
+                        desc: 'Manajemen event dan rekayasa lalu lintas' 
+                      }
+                    ].map((feature, i) => (
+                      <div key={i} className="pb-4 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 p-2 rounded transition-colors">
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 bg-red-800 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-white text-sm font-bold">{i + 1}</span>
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900 mb-1">{feature.title}</h4>
+                            <p className="text-sm text-gray-600">{feature.desc}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-lg p-6 transform hover:shadow-xl transition-all duration-300">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">Teknologi</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {['React', 'Leaflet', 'A* Algorithm', 'OpenStreetMap', 'Real-time Data', 'Supabase'].map((tech) => (
+                      <span key={tech} className="px-3 py-1 bg-red-100 text-red-800 text-sm font-medium rounded-full hover:bg-red-200 transition-colors">
+                        {tech}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
 

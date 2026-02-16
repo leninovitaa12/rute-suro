@@ -10,7 +10,7 @@ import AdminTraffic from './admin/AdminTraffic.jsx'
 import AdminEvent from './admin/AdminEvent.jsx'
 import AdminLogin from './admin/AdminLogin.jsx'
 import AdminLayout from '../components/AdminLayout.jsx'
-import { AdminSejarah, AdminJadwal, AdminTentang } from './admin/AdminDashboardContent.jsx'
+import { AdminSejarah, AdminTentang } from './admin/AdminDashboardContent.jsx'
 import Navbar from '../components/Navbar.jsx'
 
 export default function App() {
@@ -35,7 +35,6 @@ export default function App() {
           {section === 'traffic' && <AdminTraffic />}
           {section === 'events' && <AdminEvent />}
           {section === 'sejarah' && <AdminSejarah />}
-          {section === 'jadwal' && <AdminJadwal />}
           {section === 'tentang' && <AdminTentang />}
         </AdminLayout>
       )

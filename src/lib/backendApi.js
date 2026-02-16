@@ -180,3 +180,133 @@ export const deleteEvent = async (eventId) => {
     throw error
   }
 }
+
+// ================================================================
+// SUPABASE SEJARAH API (CRUD Operations)
+// ================================================================
+
+export const getSejarah = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('sejarah')
+      .select('*')
+      .order('id', { ascending: true })
+
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('[backendApi] Error fetching sejarah:', error.message)
+    throw error
+  }
+}
+
+export const createSejarah = async (sejarahData) => {
+  try {
+    const { data, error } = await supabase
+      .from('sejarah')
+      .insert([sejarahData])
+      .select()
+
+    if (error) throw error
+    return data?.[0]
+  } catch (error) {
+    console.error('[backendApi] Error creating sejarah:', error.message)
+    throw error
+  }
+}
+
+export const updateSejarah = async (sejarahId, sejarahData) => {
+  try {
+    const { data, error } = await supabase
+      .from('sejarah')
+      .update(sejarahData)
+      .eq('id', sejarahId)
+      .select()
+
+    if (error) throw error
+    return data?.[0]
+  } catch (error) {
+    console.error('[backendApi] Error updating sejarah:', error.message)
+    throw error
+  }
+}
+
+export const deleteSejarah = async (sejarahId) => {
+  try {
+    const { error } = await supabase
+      .from('sejarah')
+      .delete()
+      .eq('id', sejarahId)
+
+    if (error) throw error
+    return true
+  } catch (error) {
+    console.error('[backendApi] Error deleting sejarah:', error.message)
+    throw error
+  }
+}
+
+// ================================================================
+// SUPABASE TENTANG API (CRUD Operations)
+// ================================================================
+
+export const getTentang = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('tentang')
+      .select('*')
+      .order('id', { ascending: true })
+
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('[backendApi] Error fetching tentang:', error.message)
+    throw error
+  }
+}
+
+export const createTentang = async (tentangData) => {
+  try {
+    const { data, error } = await supabase
+      .from('tentang')
+      .insert([tentangData])
+      .select()
+
+    if (error) throw error
+    return data?.[0]
+  } catch (error) {
+    console.error('[backendApi] Error creating tentang:', error.message)
+    throw error
+  }
+}
+
+export const updateTentang = async (tentangId, tentangData) => {
+  try {
+    const { data, error } = await supabase
+      .from('tentang')
+      .update(tentangData)
+      .eq('id', tentangId)
+      .select()
+
+    if (error) throw error
+    return data?.[0]
+  } catch (error) {
+    console.error('[backendApi] Error updating tentang:', error.message)
+    throw error
+  }
+}
+
+export const deleteTentang = async (tentangId) => {
+  try {
+    const { error } = await supabase
+      .from('tentang')
+      .delete()
+      .eq('id', tentangId)
+
+    if (error) throw error
+    return true
+  } catch (error) {
+    console.error('[backendApi] Error deleting tentang:', error.message)
+    throw error
+  }
+}

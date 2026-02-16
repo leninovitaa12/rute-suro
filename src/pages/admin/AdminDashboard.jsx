@@ -84,18 +84,12 @@ export default function AdminDashboard() {
       {/* Quick Actions */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             onClick={() => navigate('/admin/dashboard/sejarah')}
             className="px-4 py-3 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-all duration-300 text-left border border-red-200"
           >
             Kelola Sejarah
-          </button>
-          <button
-            onClick={() => navigate('/admin/dashboard/jadwal')}
-            className="px-4 py-3 bg-blue-50 text-blue-600 font-bold rounded-lg hover:bg-blue-100 transition-all duration-300 text-left border border-blue-200"
-          >
-            Kelola Jadwal
           </button>
           <button
             onClick={() => navigate('/admin/dashboard/tentang')}
@@ -104,10 +98,10 @@ export default function AdminDashboard() {
             Kelola Tentang
           </button>
           <button
-            onClick={() => navigate('/admin/dashboard/traffic')}
-            className="px-4 py-3 bg-purple-50 text-purple-600 font-bold rounded-lg hover:bg-purple-100 transition-all duration-300 text-left border border-purple-200"
+            onClick={() => navigate('/admin/dashboard/event')}
+            className="px-4 py-3 bg-blue-50 text-blue-600 font-bold rounded-lg hover:bg-blue-100 transition-all duration-300 text-left border border-blue-200"
           >
-            Kelola Trafik
+            Kelola Event
           </button>
         </div>
       </div>

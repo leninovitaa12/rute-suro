@@ -14,7 +14,6 @@ export default function AdminLayout({ children }) {
 
   const contentMenuItems = [
     { name: 'Sejarah', path: '/admin/dashboard/sejarah' },
-    { name: 'Jadwal', path: '/admin/dashboard/jadwal' },
     { name: 'Tentang', path: '/admin/dashboard/tentang' }
   ]
 

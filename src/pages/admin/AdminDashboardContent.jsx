@@ -1,14 +1,47 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { getSejarah, createSejarah, updateSejarah, deleteSejarah, getTentang, createTentang, updateTentang, deleteTentang } from '../../lib/backendApi'
 
 // Reusable CRUD Manager Component
-function ContentManager({ title, description, itemName }) {
+function ContentManager({ title, description, itemName, contentType }) {
   const [showForm, setShowForm] = useState(false)
-  const [items, setItems] = useState([
-    { id: 1, name: 'Item 1', description: 'Deskripsi item 1', date: '2024-01-15' },
-    { id: 2, name: 'Item 2', description: 'Deskripsi item 2', date: '2024-01-20' }
-  ])
+  const [items, setItems] = useState([])
   const [editingId, setEditingId] = useState(null)
-  const [formData, setFormData] = useState({ name: '', description: '', date: '' })
+  const [loading, setLoading] = useState(true)
+  const [formData, setFormData] = useState(getInitialFormData(contentType))
+  const [error, setError] = useState(null)
+
+  function getInitialFormData(type) {
+    if (type === 'sejarah') {
+      return { title: '', description: '' }
+    } else if (type === 'tentang') {
+      return { title: '', description: '' }
+    }
+    return {}
+  }
+
+  // Load data on mount
+  useEffect(() => {
+    loadData()
+  }, [contentType])
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      let data = []
+      if (contentType === 'sejarah') {
+        data = await getSejarah()
+      } else if (contentType === 'tentang') {
+        data = await getTentang()
+      }
+      setItems(data)
+    } catch (err) {
+      console.error('[v0] Error loading data:', err)
+      setError('Gagal memuat data')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Animation styles
   const styles = `
@@ -60,7 +93,7 @@ function ContentManager({ title, description, itemName }) {
   `
 
   const handleAddClick = () => {
-    setFormData({ name: '', description: '', date: '' })
+    setFormData(getInitialFormData(contentType))
     setEditingId(null)
     setShowForm(true)
   }
@@ -71,9 +104,19 @@ function ContentManager({ title, description, itemName }) {
     setShowForm(true)
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Apakah Anda yakin ingin menghapus item ini?')) {
-      setItems(items.filter(item => item.id !== id))
+      try {
+        if (contentType === 'sejarah') {
+          await deleteSejarah(id)
+        } else if (contentType === 'tentang') {
+          await deleteTentang(id)
+        }
+        setItems(items.filter(item => item.id !== id))
+      } catch (err) {
+        console.error('[v0] Error deleting:', err)
+        setError('Gagal menghapus item')
+      }
     }
   }
 
@@ -82,19 +125,37 @@ function ContentManager({ title, description, itemName }) {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    if (editingId) {
-      setItems(items.map(item => 
-        item.id === editingId 
-          ? { ...formData, id: editingId }
-          : item
-      ))
-    } else {
-      setItems([...items, { ...formData, id: Date.now() }])
+    try {
+      if (editingId) {
+        if (contentType === 'sejarah') {
+          await updateSejarah(editingId, formData)
+        } else if (contentType === 'tentang') {
+          await updateTentang(editingId, formData)
+        }
+        setItems(items.map(item => 
+          item.id === editingId 
+            ? { ...item, ...formData }
+            : item
+        ))
+      } else {
+        let newItem
+        if (contentType === 'sejarah') {
+          newItem = await createSejarah(formData)
+        } else if (contentType === 'tentang') {
+          newItem = await createTentang(formData)
+        }
+        if (newItem) {
+          setItems([...items, newItem])
+        }
+      }
+      setShowForm(false)
+      setFormData(getInitialFormData(contentType))
+    } catch (err) {
+      console.error('[v0] Error submitting:', err)
+      setError('Gagal menyimpan item')
     }
-    setShowForm(false)
-    setFormData({ name: '', description: '', date: '' })
   }
 
   return (
@@ -167,39 +228,27 @@ function ContentManager({ title, description, itemName }) {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Nama</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Judul</label>
                 <input
                   type="text"
-                  name="name"
-                  value={formData.name}
+                  name="title"
+                  value={formData.title}
                   onChange={handleFormChange}
-                  placeholder="Masukkan nama"
+                  placeholder="Masukkan judul"
                   className="form-input w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-300"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Deskripsi</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Deskripsi / Konten</label>
                 <textarea
                   name="description"
                   value={formData.description}
                   onChange={handleFormChange}
-                  placeholder="Masukkan deskripsi"
-                  rows="4"
+                  placeholder="Masukkan deskripsi atau konten lengkap"
+                  rows="6"
                   className="form-input w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-300 resize-none"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Tanggal</label>
-                <input
-                  type="date"
-                  name="date"
-                  value={formData.date}
-                  onChange={handleFormChange}
-                  className="form-input w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-300"
                   required
                 />
               </div>
@@ -230,16 +279,27 @@ function ContentManager({ title, description, itemName }) {
           <table className="w-full">
             <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
               <tr>
-                <th className="px-6 py-4 text-left text-sm font-bold text-gray-900">Nama</th>
+                <th className="px-6 py-4 text-left text-sm font-bold text-gray-900">Judul</th>
                 <th className="px-6 py-4 text-left text-sm font-bold text-gray-900">Deskripsi</th>
-                <th className="px-6 py-4 text-left text-sm font-bold text-gray-900">Tanggal</th>
                 <th className="px-6 py-4 text-left text-sm font-bold text-gray-900">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {items.length === 0 ? (
+              {loading ? (
                 <tr>
-                  <td colSpan="4" className="px-6 py-12 text-center">
+                  <td colSpan="3" className="px-6 py-12 text-center">
+                    <p className="text-gray-500">Memuat data...</p>
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan="3" className="px-6 py-12 text-center">
+                    <p className="text-red-600 font-medium">{error}</p>
+                  </td>
+                </tr>
+              ) : items.length === 0 ? (
+                <tr>
+                  <td colSpan="3" className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -252,9 +312,8 @@ function ContentManager({ title, description, itemName }) {
               ) : (
                 items.map((item, idx) => (
                   <tr key={item.id} className="table-row hover:bg-red-50/30 transition-colors duration-300 border-b border-gray-100 last:border-0" style={{animationDelay: `${idx * 0.05}s`}}>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900">{item.name}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-gray-900">{item.title}</td>
                     <td className="px-6 py-4 text-sm text-gray-600 truncate max-w-xs" title={item.description}>{item.description.substring(0, 40)}{item.description.length > 40 ? '...' : ''}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600 font-medium">{new Date(item.date).toLocaleDateString('id-ID')}</td>
                     <td className="px-6 py-4 text-sm space-x-2 flex">
                       <button
                         onClick={() => handleEditClick(item)}
@@ -292,16 +351,7 @@ export function AdminSejarah() {
       title="Manajemen Sejarah" 
       description="Kelola konten sejarah Grebeg Suro"
       itemName="Sejarah"
-    />
-  )
-}
-
-export function AdminJadwal() {
-  return (
-    <ContentManager 
-      title="Manajemen Jadwal" 
-      description="Kelola jadwal acara Grebeg Suro"
-      itemName="Jadwal"
+      contentType="sejarah"
     />
   )
 }
@@ -312,6 +362,7 @@ export function AdminTentang() {
       title="Manajemen Tentang" 
       description="Kelola informasi tentang Rute Suro"
       itemName="Tentang"
+      contentType="tentang"
     />
   )
 }
