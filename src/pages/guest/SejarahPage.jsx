@@ -1,14 +1,101 @@
 // src/pages/guest/SejarahPage.jsx
-// ✅ UI upgrade — fungsi tidak berubah
 
-import React, { useState, useEffect } from "react"
-import { Link } from "react-router-dom"
-import { getSejarah } from "../../lib/backendApi"
+import React, { useState, useEffect, useRef } from 'react'
+import { getSejarah } from '../../lib/backendApi'
+import CTASection from '../../components/CTASection'
+
+// ── SVG Icons ──
+const IconSpirituality = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2L9.5 8.5H3l5.5 4-2 6.5L12 15l5.5 4-2-6.5L21 8.5h-6.5z" />
+  </svg>
+)
+const IconCommunity = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+)
+const IconPreservation = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </svg>
+)
+const IconCastle = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 21V7l3-4 3 4V5l3-2 3 2V7l3-4 3 4v14H3z" /><rect x="9" y="14" width="6" height="7" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+)
+const IconSword = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" /><line x1="13" y1="19" x2="19" y2="13" />
+    <line x1="16" y1="16" x2="20" y2="20" /><line x1="19" y1="21" x2="21" y2="19" />
+  </svg>
+)
+const IconScroll = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
+  </svg>
+)
+const IconGlobe = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+)
+const IconChevronDown = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+)
+const IconLightbulb = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="9" y1="18" x2="15" y2="18" /><line x1="10" y1="22" x2="14" y2="22" />
+    <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14" />
+  </svg>
+)
+
+// ── Static Data ──
+const NILAI = [
+  { Icon: IconSpirituality, label: 'Spiritualitas', desc: 'Pendekatan diri kepada Sang Pencipta' },
+  { Icon: IconCommunity,    label: 'Gotong Royong', desc: 'Kebersamaan tanpa memandang golongan' },
+  { Icon: IconPreservation, label: 'Pelestarian',   desc: 'Menjaga seni budaya Reog tetap menyala' },
+]
+
+const TIMELINE_STATIC = [
+  { era: 'Abad ke-15',   side: 'left',  Icon: IconCastle, desc: 'Awal mula ritual Suro sebagai bentuk syukur dan pemurnian diri para warak di Ponorogo setelah masa panen.' },
+  { era: 'Era Kolonial', side: 'right', Icon: IconSword,  desc: 'Tradisi tetap dipertahankan secara sembunyi-sembunyi sebagai simbol perlawanan budaya dan perekat semangat yang rekat.' },
+  { era: 'Tahun 1987',  side: 'left',  Icon: IconScroll, desc: 'Pemerintah Kabupaten Ponorogo meresmikan Grebeg Suro sebagai festival budaya resmi yang melibatkan parade kolosal.' },
+  { era: 'Era Modern',  side: 'right', Icon: IconGlobe,  desc: 'Grebeg Suro bertransformasi menjadi Festival Nasional Reog Ponorogo (FNRP), menarik wisatawan dari seluruh penjuru dunia.' },
+]
+
+// ── Hook ──
+function useInView() {
+  const ref = useRef(null)
+  const [inView, setInView] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setInView(true); obs.disconnect() } },
+      { threshold: 0.12 }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+  return [ref, inView]
+}
 
 export default function SejarahPage() {
   const [sejarahItems, setSejarahItems] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError]     = useState(null)
+
+  const [introRef,  introInView]  = useInView()
+  const [legendRef, legendInView] = useInView()
+  const [tlRef,     tlInView]     = useInView()
 
   useEffect(() => { loadSejarah() }, [])
 
@@ -18,7 +105,7 @@ export default function SejarahPage() {
       const data = await getSejarah()
       setSejarahItems(data)
     } catch (err) {
-      console.error('[v0] Error loading sejarah:', err)
+      console.error('[SejarahPage] Error:', err)
       setError('Gagal memuat data sejarah')
     } finally {
       setLoading(false)
@@ -26,152 +113,343 @@ export default function SejarahPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <style>{`
+        .s-hero {
+          min-height: 90vh;
+          background:
+            linear-gradient(160deg, rgba(60,3,3,0.92) 0%, rgba(110,8,8,0.78) 45%, rgba(15,1,1,0.62) 100%),
+            url('/images/sejarah-1.jpg') center/cover no-repeat;
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          text-align: center; color: white;
+          padding: 100px 24px 60px;
+          position: relative; overflow: hidden;
+        }
+        .s-hero::after {
+          content: ''; position: absolute; inset: 0; pointer-events: none;
+          background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+          background-size: 28px 28px;
+        }
+        @keyframes bounceY {
+          0%,100% { transform: translateY(0); opacity: .4; }
+          50%      { transform: translateY(10px); opacity: .9; }
+        }
+        .scroll-caret { animation: bounceY 2.2s ease-in-out infinite; position: relative; z-index: 1; color: rgba(255,255,255,.45); }
+
         .s-card {
-          position:relative; overflow:hidden;
-          background:#fff; border:1.5px solid #e5e7eb; border-radius:14px;
-          transition:border-color 0.35s ease, transform 0.35s cubic-bezier(0.34,1.36,0.64,1), box-shadow 0.35s ease;
+          position: relative; overflow: hidden;
+          background: #fff; border: 1.5px solid #e5e7eb; border-radius: 14px;
+          transition: border-color .4s, transform .4s cubic-bezier(.34,1.4,.64,1), box-shadow .4s;
         }
         .s-card::before {
-          content:''; position:absolute; top:0; left:0; right:0; height:3px;
-          background:linear-gradient(90deg,#991b1b,#dc2626,#f87171);
-          transform:scaleX(0); transform-origin:left;
-          transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1); border-radius:14px 14px 0 0;
+          content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+          background: linear-gradient(90deg, transparent, #dc2626, #f87171, transparent);
+          transform: translateX(-100%); transition: transform .6s cubic-bezier(.4,0,.2,1);
         }
-        .s-card:hover { border-color:#991b1b; transform:translateY(-6px); box-shadow:0 20px 44px rgba(153,27,27,0.12); }
-        .s-card:hover::before { transform:scaleX(1); }
+        .s-card::after {
+          content: ''; position: absolute; inset: 0;
+          background: radial-gradient(circle at 50% 0%, rgba(220,38,38,.04) 0%, transparent 65%);
+          opacity: 0; transition: opacity .4s; pointer-events: none;
+        }
+        .s-card:hover { border-color: rgba(153,27,27,.30); transform: translateY(-4px); box-shadow: 0 16px 36px rgba(153,27,27,.08); }
+        .s-card:hover::before { transform: translateX(100%); }
+        .s-card:hover::after  { opacity: 1; }
 
-        .btn-outline-red {
-          display:inline-flex; align-items:center; gap:8px;
-          padding:12px 32px; border:2px solid #991b1b;
-          color:#991b1b; font-weight:700; font-size:15px;
-          border-radius:6px; text-decoration:none; background:transparent;
-          position:relative; overflow:hidden;
-          transition:color 0.3s, transform 0.2s, box-shadow 0.3s;
+        .nilai-row {
+          display: flex; align-items: flex-start; gap: 12px;
+          padding: 12px 0; border-bottom: 1px solid #f3f4f6;
+          transition: transform .2s ease;
         }
-        .btn-outline-red::before {
-          content:''; position:absolute; inset:0;
-          background:linear-gradient(135deg,#991b1b,#dc2626);
-          transform:scaleX(0); transform-origin:left;
-          transition:transform 0.35s cubic-bezier(0.34,1.2,0.64,1); z-index:0;
+        .nilai-row:last-child { border-bottom: none; }
+        .nilai-row:hover { transform: translateX(4px); }
+        .nilai-icon {
+          width: 36px; height: 36px; border-radius: 9px;
+          background: rgba(153,27,27,.07); color: #991b1b;
+          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
-        .btn-outline-red:hover::before { transform:scaleX(1); }
-        .btn-outline-red:hover { color:white; transform:translateY(-2px); box-shadow:0 8px 22px rgba(153,27,27,0.25); }
-        .btn-outline-red span { position:relative; z-index:1; }
 
-        @keyframes timelineDot {
-          0%,100% { box-shadow:0 0 0 0 rgba(153,27,27,0.35); }
-          50%      { box-shadow:0 0 0 8px rgba(153,27,27,0); }
+        /* TIMELINE */
+        .tl-wrap { position: relative; }
+        .tl-axis {
+          position: absolute; left: 50%; transform: translateX(-50%);
+          width: 2px; top: 0; bottom: 0;
+          background: linear-gradient(to bottom, transparent, #dc2626 12%, #dc2626 88%, transparent);
         }
-        .tl-dot { animation: timelineDot 3s ease-in-out infinite; }
+        @media (max-width: 767px) {
+          .tl-axis { left: 22px; transform: none; }
+          .tl-row  { grid-template-columns: 48px 1fr !important; }
+          .tl-left-cell { display: none !important; }
+          .tl-center-cell { justify-content: flex-start !important; }
+        }
+        .tl-row {
+          display: grid; grid-template-columns: 1fr 60px 1fr;
+          align-items: center; margin-bottom: 48px;
+          position: relative; z-index: 1;
+        }
+        .tl-center-cell { display: flex; justify-content: center; }
+        .tl-dot {
+          width: 46px; height: 46px; border-radius: 50%;
+          background: linear-gradient(135deg, #991b1b, #dc2626);
+          border: 4px solid white;
+          box-shadow: 0 0 0 3px rgba(153,27,27,.18), 0 6px 20px rgba(153,27,27,.28);
+          display: flex; align-items: center; justify-content: center;
+          color: white; flex-shrink: 0;
+          transition: transform .3s cubic-bezier(.34,1.6,.64,1), box-shadow .3s;
+        }
+        .tl-dot:hover { transform: scale(1.18); box-shadow: 0 0 0 5px rgba(153,27,27,.14), 0 8px 26px rgba(153,27,27,.36); }
+        .tl-card {
+          background: #fff; border: 1.5px solid #e5e7eb; border-radius: 14px;
+          padding: 20px; position: relative; overflow: hidden;
+          transition: border-color .4s, transform .4s cubic-bezier(.34,1.4,.64,1), box-shadow .4s;
+        }
+        .tl-card::before {
+          content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+          background: linear-gradient(90deg, transparent, #dc2626, #f87171, transparent);
+          transform: translateX(-100%); transition: transform .6s cubic-bezier(.4,0,.2,1);
+        }
+        .tl-card:hover { border-color: rgba(153,27,27,.30); transform: translateY(-4px); box-shadow: 0 14px 34px rgba(153,27,27,.08); }
+        .tl-card:hover::before { transform: translateX(100%); }
+        .tl-ghost { display: flex; align-items: center; justify-content: center; opacity: .08; min-height: 80px; color: #991b1b; }
+
+        .cms-card {
+          background: #f9fafb; border: 1.5px solid #f3f4f6; border-radius: 13px;
+          padding: 20px; position: relative; overflow: hidden;
+          transition: border-color .4s, transform .4s cubic-bezier(.34,1.4,.64,1), box-shadow .4s;
+        }
+        .cms-card::before {
+          content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+          background: linear-gradient(90deg, transparent, #dc2626, #f87171, transparent);
+          transform: translateX(-100%); transition: transform .6s cubic-bezier(.4,0,.2,1);
+        }
+        .cms-card:hover { border-color: rgba(153,27,27,.24); transform: translateY(-4px); box-shadow: 0 12px 32px rgba(153,27,27,.07); }
+        .cms-card:hover::before { transform: translateX(100%); }
+
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(28px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .fu { opacity: 0; }
+        .fu.on { animation: fadeUp .55s ease-out forwards; }
+        .fu.d1 { animation-delay: .08s; }
+        .fu.d2 { animation-delay: .18s; }
+        .fu.d3 { animation-delay: .28s; }
+        .fu.d4 { animation-delay: .38s; }
       `}</style>
 
-      {/* ── HEADER ── */}
-      <section className="bg-red-800 text-white py-12 sm:py-16 relative overflow-hidden">
-        <div style={{ position:'absolute', inset:0, pointerEvents:'none' }}>
-          <div style={{ position:'absolute', top:'-60px', right:'-60px', width:'280px', height:'280px', borderRadius:'50%', background:'rgba(255,255,255,0.05)' }} />
-          <div style={{ position:'absolute', bottom:'-40px', left:'-40px', width:'200px', height:'200px', borderRadius:'50%', background:'rgba(255,255,255,0.04)' }} />
-          <div style={{ position:'absolute', top:'30%', left:'15%', width:'70px', height:'70px', borderRadius:'50%', border:'1.5px solid rgba(255,255,255,0.1)' }} />
+      {/* ══ 1. HERO ══ */}
+      <section className="s-hero">
+        <div className="relative z-10 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-[10px] font-bold uppercase tracking-[2.5px] text-white/85 mb-6">
+          Warisan Budaya Dunia
         </div>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8" style={{ position:'relative', zIndex:1 }}>
-          <div style={{ display:'inline-flex', alignItems:'center', gap:'8px', padding:'4px 14px', borderRadius:'999px', background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)', fontSize:'11px', letterSpacing:'2px', textTransform:'uppercase', color:'rgba(255,255,255,0.85)', fontWeight:700, marginBottom:'14px' }}>
-            <span style={{ width:6, height:6, borderRadius:'50%', background:'#fca5a5', display:'inline-block' }} />
-            Warisan Budaya
+        <h1
+          className="relative z-10 text-white font-black leading-[1.04] mb-3"
+          style={{ fontSize: 'clamp(38px,7.5vw,82px)', letterSpacing: '-1.5px' }}
+        >
+          Menelusuri Jejak
+          <span
+            className="block italic"
+            style={{ background: 'linear-gradient(135deg,#fca5a5,#f87171)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}
+          >
+            Grebeg Suro
+          </span>
+        </h1>
+        <p className="relative z-10 text-white/70 max-w-lg leading-relaxed mb-10" style={{ fontSize: 'clamp(14px,2.5vw,17px)' }}>
+          Kisah keberanian, spiritualitas, dan tradisi adiluhung yang membentuk identitas masyarakat Ponorogo selama berabad-abad.
+        </p>
+        <div className="scroll-caret"><IconChevronDown /></div>
+      </section>
+
+      {/* ══ 2. INTRO ══ */}
+      <section ref={introRef} className="py-16 sm:py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 lg:gap-14 items-start">
+
+            {/* Left */}
+            <div className={`lg:col-span-3 fu${introInView ? ' on' : ''}`}>
+              <h2
+                className="font-black text-gray-900 leading-tight mb-4"
+                style={{ fontSize: 'clamp(22px,4vw,36px)', letterSpacing: '-0.5px' }}
+              >
+                Lebih dari Sekadar Perayaan,<br />
+                Sebuah <span className="text-[#991b1b]">Manifestasi Syukur.</span>
+              </h2>
+              <p className="text-gray-600 leading-relaxed text-base mb-7">
+                Grebeg Suro merupakan tradisi tahunan masyarakat Ponorogo yang bertepatan dengan malam 1 Suro (1 Muharram). Perayaan ini tidak hanya menjadi pesta rakyat, namun juga merupakan paduan antara nilai religius, seni budaya Reog yang mendunia, dan penghormatan terhadap leluhur.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                {['/images/sejarah-2.jpg', '/images/sejarah-3.jpg'].map((src, i) => (
+                  <div key={i} className="rounded-xl overflow-hidden h-48 shadow-md transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl">
+                    <img src={src} alt="Budaya Ponorogo" className="w-full h-full object-cover block" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right */}
+            <div className={`lg:col-span-2 fu d2${introInView ? ' on' : ''} flex flex-col gap-4`}>
+              <div className="s-card p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[#991b1b]"><IconLightbulb /></span>
+                  <span className="text-[9px] font-extrabold uppercase tracking-[2.5px] text-[#991b1b]">Tahukah Anda?</span>
+                </div>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  Istilah <strong>"Grebeg"</strong> berasal dari kata <em>"Gumerebeg"</em> yang menggambarkan suasana riuh rendah dan semangat kebersamaan masyarakat Jawa, menyambut malam pergantian tahun Jawa.
+                </p>
+              </div>
+              <div className="s-card p-6">
+                <p className="text-sm font-extrabold text-gray-900 mb-3 tracking-wide">Nilai Inti</p>
+                {NILAI.map(({ Icon, label, desc }, i) => (
+                  <div key={i} className="nilai-row">
+                    <div className="nilai-icon"><Icon /></div>
+                    <div>
+                      <span className="font-bold text-[#991b1b] text-sm">{label}: </span>
+                      <span className="text-sm text-gray-500">{desc}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
-          <h1 className="text-4xl sm:text-5xl font-bold mb-4">Sejarah & Tradisi Event</h1>
-          <p className="text-xl text-red-100">Menyelami lebih dalam tradisi dan warisan budaya Grebeg Suro yang kaya akan makna dan sejarah</p>
         </div>
       </section>
 
-      {/* ── CONTENT ── */}
-      <section className="py-12 sm:py-16 relative overflow-hidden">
-        <div style={{ position:'absolute', inset:0, pointerEvents:'none', overflow:'hidden' }}>
-          <div style={{ position:'absolute', top:'-80px', right:'-60px', width:'350px', height:'350px', borderRadius:'50%', background:'radial-gradient(circle, rgba(153,27,27,0.05) 0%, transparent 70%)' }} />
-          <div style={{ position:'absolute', bottom:'-60px', left:'-50px', width:'300px', height:'300px', borderRadius:'50%', background:'radial-gradient(circle, rgba(153,27,27,0.04) 0%, transparent 70%)' }} />
-          <div style={{ position:'absolute', top:'40%', right:'8%', width:'90px', height:'90px', borderRadius:'50%', border:'1.5px solid rgba(153,27,27,0.07)' }} />
-          <div style={{ position:'absolute', bottom:'25%', left:'6%', width:'55px', height:'55px', borderRadius:'50%', background:'rgba(153,27,27,0.04)' }} />
-          <div style={{ position:'absolute', inset:0, backgroundImage:'radial-gradient(circle, rgba(153,27,27,0.06) 1px, transparent 1px)', backgroundSize:'32px 32px', maskImage:'radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 100%)', WebkitMaskImage:'radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 100%)' }} />
+      {/* ══ 3. LEGENDA ══ */}
+      <section ref={legendRef} className="py-16 sm:py-20 bg-gray-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2
+              className="font-black text-gray-900 mb-3"
+              style={{ fontSize: 'clamp(22px,4vw,34px)', letterSpacing: '-0.4px' }}
+            >
+              Legenda Kelono Sewandono
+            </h2>
+            <div className="w-11 h-0.5 mx-auto rounded-full" style={{ background: 'linear-gradient(90deg,#991b1b,#dc2626)' }} />
+          </div>
+
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-10 items-stretch fu${legendInView ? ' on' : ''}`}>
+            {/* Image — taller */}
+            <div className="rounded-2xl overflow-hidden shadow-xl transition-transform duration-500 hover:scale-[1.01]" style={{ minHeight: '480px' }}>
+              <img
+                src="/images/sejarah-1.jpg"
+                alt="Wayang Ponorogo"
+                className="w-full h-full object-cover block"
+                style={{ minHeight: '480px' }}
+              />
+            </div>
+            {/* Text */}
+            <div className="flex flex-col justify-center gap-5">
+              <p className="text-gray-700 leading-[1.85] text-[15px]">
+                Akar dari Grebeg Suro tak lepas dari legenda Prabu Kelono Sewandono dari Kerajaan Bantarangin. Kisahnya melamar Dewi Sanggalangit dari Kediri menciptakan syarat berupa pertunjukan seni yang belum pernah ada sebelumnya.
+              </p>
+              <p className="text-gray-500 leading-[1.85] text-[15px]">
+                Perjalanan sang Prabu yang diiringi oleh pasukan berkuda Jatil dan Bujang Ganong inilah yang kemudian menjadi cikal bakal kesenian Reog Ponorogo yang megah.
+              </p>
+            </div>
+          </div>
         </div>
+      </section>
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8" style={{ position:'relative', zIndex:1 }}>
-          {loading ? (
-            <div className="text-center py-12"><p className="text-gray-600 text-lg">Memuat data sejarah...</p></div>
-          ) : error ? (
-            <div className="s-card" style={{ padding:'32px', marginBottom:'48px', background:'#fef2f2', borderColor:'#fecaca' }}>
-              <p style={{ color:'#991b1b', fontWeight:600, textAlign:'center' }}>{error}</p>
+      {/* ══ 4. TIMELINE ══ */}
+      <section id="timeline" ref={tlRef} className="py-16 sm:py-20 bg-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+
+          <div className={`text-center mb-12 fu${tlInView ? ' on' : ''}`}>
+            <div className="inline-flex items-center px-3.5 py-1 rounded-full bg-[#991b1b]/[0.06] border border-[#991b1b]/[0.14] text-[10px] font-bold uppercase tracking-[2px] text-[#991b1b] mb-3">
+              Perjalanan Waktu
             </div>
-          ) : sejarahItems.length === 0 ? (
-            <div className="s-card text-center" style={{ padding:'48px', marginBottom:'48px' }}>
-              <p style={{ color:'#6b7280' }}>Belum ada konten sejarah</p>
-            </div>
-          ) : (
-            <div style={{ marginBottom:'64px' }}>
-              {sejarahItems.map((item, idx) => idx === 0 && (
-                <div key={item.id} style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:'32px', marginBottom:'64px' }}>
-                  <div style={{ background:'linear-gradient(135deg,#7f1d1d,#991b1b)', borderRadius:'14px', minHeight:'240px', display:'flex', alignItems:'center', justifyContent:'center', color:'white', boxShadow:'0 20px 48px rgba(153,27,27,0.25)' }}>
-                    <div style={{ textAlign:'center' }}>
-                      <div style={{ fontSize:'64px', fontWeight:900, opacity:0.2, marginBottom:'8px' }}>KP</div>
-                      <p style={{ fontWeight:700, fontSize:'17px' }}>{item.title}</p>
+            <h2
+              className="font-black text-gray-900 mb-2"
+              style={{ fontSize: 'clamp(22px,4vw,34px)', letterSpacing: '-0.4px' }}
+            >
+              Evolusi Tradisi
+            </h2>
+            <p className="text-gray-400 text-[15px]">Transformasi Grebeg Suro dari masa ke masa</p>
+          </div>
+
+          <div className="tl-wrap">
+            <div className="tl-axis" />
+            {TIMELINE_STATIC.map(({ era, side, Icon, desc }, idx) => (
+              <div key={idx} className={`tl-row fu${tlInView ? ' on' : ''} d${idx + 1}`}>
+                <div className="tl-left-cell" style={{ paddingRight: '24px', textAlign: 'right' }}>
+                  {side === 'left' ? (
+                    <div className="tl-card text-left">
+                      <p className="text-[11px] font-extrabold text-[#991b1b] uppercase tracking-wide mb-1.5">{era}</p>
+                      <p className="text-[13px] text-gray-500 leading-relaxed">{desc}</p>
                     </div>
-                  </div>
-                  <div>
-                    <h2 style={{ fontSize:'28px', fontWeight:800, color:'#111827', marginBottom:'16px', letterSpacing:'-0.5px' }}>{item.title}</h2>
-                    <p style={{ color:'#6b7280', lineHeight:1.8, whiteSpace:'pre-wrap' }}>{item.description}</p>
-                  </div>
+                  ) : (
+                    <div className="tl-ghost"><Icon /></div>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Timeline */}
-          {!loading && !error && sejarahItems.length > 0 && (
-            <div style={{ marginBottom:'64px' }}>
-              <div style={{ textAlign:'center', marginBottom:'48px' }}>
-                <div style={{ display:'inline-flex', alignItems:'center', gap:'8px', padding:'4px 14px', borderRadius:'999px', background:'rgba(153,27,27,0.07)', border:'1px solid rgba(153,27,27,0.15)', fontSize:'11px', letterSpacing:'2px', textTransform:'uppercase', color:'#991b1b', fontWeight:700, marginBottom:'14px' }}>
-                  <span style={{ width:6, height:6, borderRadius:'50%', background:'#991b1b', display:'inline-block' }} />
-                  Arsip
+                <div className="tl-center-cell">
+                  <div className="tl-dot"><Icon /></div>
                 </div>
-                <h2 style={{ fontSize:'clamp(24px,4vw,34px)', fontWeight:800, color:'#111827', letterSpacing:'-0.5px' }}>Konten Sejarah</h2>
+                <div style={{ paddingLeft: '24px' }}>
+                  {side === 'right' ? (
+                    <div className="tl-card">
+                      <p className="text-[11px] font-extrabold text-[#991b1b] uppercase tracking-wide mb-1.5">{era}</p>
+                      <p className="text-[13px] text-gray-500 leading-relaxed">{desc}</p>
+                    </div>
+                  ) : (
+                    <div className="tl-ghost"><Icon /></div>
+                  )}
+                </div>
               </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:'24px' }}>
+            ))}
+          </div>
+
+          {/* CMS data */}
+          {!loading && !error && sejarahItems.length > 0 && (
+            <div className="mt-14 pt-12 border-t border-gray-100">
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center px-3.5 py-1 rounded-full bg-[#991b1b]/[0.06] border border-[#991b1b]/[0.14] text-[10px] font-bold uppercase tracking-[2px] text-[#991b1b] mb-2.5">
+                  Dari Arsip Admin
+                </div>
+                <h3 className="font-extrabold text-gray-900" style={{ fontSize: 'clamp(18px,3vw,26px)', letterSpacing: '-0.3px' }}>
+                  Catatan Sejarah
+                </h3>
+              </div>
+              <div className="flex flex-col gap-3.5">
                 {sejarahItems.map((item, idx) => (
-                  <div key={item.id} className="s-card" style={{ padding:'28px 28px 28px 80px', position:'relative' }}>
-                    <div className="tl-dot" style={{ position:'absolute', left:'24px', top:'28px', width:'40px', height:'40px', borderRadius:'12px', background:'linear-gradient(135deg,#991b1b,#dc2626)', color:'white', fontWeight:900, fontSize:'18px', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 6px 16px rgba(153,27,27,0.28)', animationDelay:`${idx * 0.4}s` }}>
-                      {idx + 1}
+                  <div key={item.id} className="cms-card">
+                    <div className="flex gap-3.5 items-start">
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-black text-sm flex-shrink-0"
+                        style={{ background: 'linear-gradient(135deg,#991b1b,#dc2626)', boxShadow: '0 4px 12px rgba(153,27,27,.20)' }}
+                      >
+                        {idx + 1}
+                      </div>
+                      <div>
+                        <h4 className="text-[15px] font-extrabold text-gray-900 mb-1">{item.title}</h4>
+                        <p className="text-gray-500 leading-relaxed text-sm whitespace-pre-wrap">{item.description}</p>
+                      </div>
                     </div>
-                    <h3 style={{ fontSize:'18px', fontWeight:800, color:'#111827', marginBottom:'8px' }}>{item.title}</h3>
-                    <p style={{ color:'#6b7280', lineHeight:1.75, whiteSpace:'pre-wrap' }}>{item.description}</p>
                   </div>
                 ))}
               </div>
             </div>
           )}
+          {loading && <div className="text-center py-10 text-gray-400">Memuat data sejarah...</div>}
+          {error   && <div className="text-center p-8 bg-red-50 rounded-xl text-[#991b1b] font-semibold mt-6">{error}</div>}
 
-          {/* Quote */}
-          {!loading && !error && sejarahItems.length > 0 && (
-            <div className="s-card" style={{ background:'linear-gradient(135deg,#7f1d1d,#991b1b)', color:'white', padding:'48px', textAlign:'center', border:'none' }}>
-              <div style={{ fontSize:'48px', opacity:0.3, lineHeight:1, marginBottom:'16px' }}>"</div>
-              <p style={{ fontSize:'clamp(16px,2.5vw,22px)', fontWeight:600, lineHeight:1.7, marginBottom:'20px' }}>
-                Grebeg Suro bukan sekadar upacara tradisional, tetapi juga simbol persatuan, doa bersama, dan komitmen masyarakat Ponorogo untuk menjaga warisan leluhur sambil melangkah maju ke masa depan.
-              </p>
-              <p style={{ color:'rgba(255,255,255,0.65)', fontWeight:600, fontSize:'14px', letterSpacing:'1px' }}>— Tokoh Budaya Ponorogo</p>
-            </div>
-          )}
         </div>
       </section>
 
-      {/* ── CTA BOTTOM ── */}
-      <section className="bg-gray-100 py-12 sm:py-16 border-t border-gray-200 relative overflow-hidden">
-        <div style={{ position:'absolute', inset:0, pointerEvents:'none' }}>
-          <div style={{ position:'absolute', top:'-30px', right:'-30px', width:'180px', height:'180px', borderRadius:'50%', background:'radial-gradient(circle, rgba(153,27,27,0.05) 0%, transparent 70%)' }} />
-        </div>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center" style={{ position:'relative', zIndex:1 }}>
-          <h2 style={{ fontSize:'clamp(22px,4vw,30px)', fontWeight:800, color:'#111827', marginBottom:'12px' }}>Ingin Melihat Jadwal Lengkap?</h2>
-          <p style={{ color:'#6b7280', marginBottom:'28px', fontSize:'16px' }}>Temukan semua jadwal acara Grebeg Suro dan rencanakan kunjungan Anda</p>
-          <Link to="/jadwal" className="btn-outline-red"><span>Lihat Jadwal Event</span></Link>
+      {/* ══ 5. QUOTE ══ */}
+      <section className="bg-gray-50 py-16 px-6 text-center">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-[54px] text-gray-200 leading-none mb-4 font-serif">"</div>
+          <p className="font-semibold text-gray-900 leading-relaxed mb-5" style={{ fontSize: 'clamp(16px,2.5vw,20px)' }}>
+            Grebeg Suro bukan sekadar upacara tradisional, tetapi juga simbol persatuan, doa bersama, dan komitmen masyarakat Ponorogo untuk menjaga warisan leluhur sambil melangkah maju ke masa depan.
+          </p>
+          <p className="text-gray-400 font-semibold text-[13px] tracking-widest">— Tokoh Budaya Ponorogo</p>
         </div>
       </section>
+
+      {/* ══ 6. CTA ══ */}
+      <CTASection />
+
     </div>
   )
 }
