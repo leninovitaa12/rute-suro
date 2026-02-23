@@ -14,7 +14,8 @@ import { api } from '../../lib/api.js'
 
 const DEFAULT_CENTER = [-7.871, 111.462]
 const OFF_ROUTE_TOLERANCE_M = 35
-const NAVBAR_H_PX = 80 // kalau navbar kamu lebih tinggi, ganti 88/96
+const NAVBAR_H_PX = 80 
+const CLOSURES_TTL_MS = 30 * 1000
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -108,7 +109,12 @@ export default function UserMapPage() {
   const [route, setRoute] = React.useState(null)
   const [pickMode, setPickMode] = React.useState('start')
 
-  const [loading, setLoading] = React.useState(false)
+  // loading granular
+  const [loadingBootstrap, setLoadingBootstrap] = React.useState(true)
+  const [loadingEvents, setLoadingEvents] = React.useState(true)
+  const [loadingClosures, setLoadingClosures] = React.useState(true)
+
+  const [loadingRoute, setLoadingRoute] = React.useState(false)
   const [msg, setMsg] = React.useState('Pilih START dan TUJUAN, lalu tekan "Cari Rute".')
 
   const [myPos, setMyPos] = React.useState(null)
@@ -119,15 +125,55 @@ export default function UserMapPage() {
   const mapRef = React.useRef(null)
   const watchIdRef = React.useRef(null)
 
+  // cache closures ringan
+  const closuresCacheRef = React.useRef({
+    data: null,
+    fetchedAt: 0
+  })
+
   const desktopH = `calc(100vh - ${NAVBAR_H_PX}px)`
 
+  // =========================
+  // BOOTSTRAP: 1x fetch
+  // =========================
   React.useEffect(() => {
+    let alive = true
+
     ;(async () => {
-      const ev = await api.get('/events')
-      setEvents(ev.data || [])
-      const cl = await api.get('/closures?active=true')
-      setClosures(cl.data || [])
+      setLoadingBootstrap(true)
+      setLoadingEvents(true)
+      setLoadingClosures(true)
+
+      try {
+        const res = await api.get('/map_bootstrap')
+        const data = res.data || {}
+
+        if (!alive) return
+
+        const ev = Array.isArray(data.events) ? data.events : []
+        const cl = Array.isArray(data.closures_active) ? data.closures_active : []
+
+        setEvents(ev)
+        setClosures(cl)
+
+        closuresCacheRef.current = {
+          data: cl,
+          fetchedAt: Date.now()
+        }
+      } catch (e) {
+        if (!alive) return
+        setMsg('Gagal memuat data peta: ' + (e?.response?.data?.error || e.message))
+      } finally {
+        if (!alive) return
+        setLoadingEvents(false)
+        setLoadingClosures(false)
+        setLoadingBootstrap(false)
+      }
     })()
+
+    return () => {
+      alive = false
+    }
   }, [])
 
   function onPick(latlng, mode) {
@@ -147,9 +193,35 @@ export default function UserMapPage() {
     setMsg(`Tujuan di-set ke event: ${ev.name}. Tekan "Cari Rute".`)
   }
 
-  async function refreshClosures() {
-    const cl = await api.get('/closures?active=true')
-    setClosures(cl.data || [])
+  // =========================
+  // Closures Refresh + Cache
+  // =========================
+  async function refreshClosures({ force = false, silent = true } = {}) {
+    const cache = closuresCacheRef.current
+    const stillValid = cache.data && Date.now() - cache.fetchedAt < CLOSURES_TTL_MS
+
+    if (!force && stillValid) {
+      setClosures(cache.data || [])
+      return
+    }
+
+    if (!silent) setMsg('Memuat rekayasa jalan...')
+    setLoadingClosures(true)
+
+    try {
+      // ambil closures_active dari /map_bootstrap
+      const res = await api.get('/map_bootstrap')
+      const data = res.data || {}
+      const cl = Array.isArray(data.closures_active) ? data.closures_active : []
+
+      setClosures(cl)
+      closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
+    } catch (e) {
+      // refresh gagal jangan mematikan map
+      console.warn('refreshClosures failed:', e)
+    } finally {
+      setLoadingClosures(false)
+    }
   }
 
   async function findRoute(customStart, customEnd, { silent = false } = {}) {
@@ -160,7 +232,7 @@ export default function UserMapPage() {
       return
     }
 
-    setLoading(true)
+    setLoadingRoute(true)
     if (!silent) setMsg('Menghitung rute A*...')
     setRoute(null)
 
@@ -168,11 +240,13 @@ export default function UserMapPage() {
       const res = await api.post('/route', { start: s, end: e })
       setRoute(res.data)
       if (!silent) setMsg(`Rute ditemukan. Estimasi ${(res.data.total_time_sec / 60).toFixed(1)} menit.`)
-      await refreshClosures()
+
+      // requirement: closures refresh setiap selesai cari rute
+      await refreshClosures({ force: true, silent: true })
     } catch (e2) {
       if (!silent) setMsg('Gagal: ' + (e2?.response?.data?.error || e2.message))
     } finally {
-      setLoading(false)
+      setLoadingRoute(false)
     }
   }
 
@@ -224,6 +298,7 @@ export default function UserMapPage() {
 
   React.useEffect(() => () => stopTracking(), [])
 
+  // off-route -> reroute otomatis
   React.useEffect(() => {
     if (!tracking) return
     if (!myPos || !end || !route?.polyline) return
@@ -231,6 +306,19 @@ export default function UserMapPage() {
     if (d > OFF_ROUTE_TOLERANCE_M) findRoute(myPos, end, { silent: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking, myPos?.lat, myPos?.lng])
+
+  // =========================
+  // requirement: closures refresh tiap 30 detik saat navigasi aktif
+  // =========================
+  React.useEffect(() => {
+    if (!tracking) return
+
+    const id = setInterval(() => {
+      refreshClosures({ force: true, silent: true })
+    }, 30_000)
+
+    return () => clearInterval(id)
+  }, [tracking])
 
   const startLabel = start ? `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}` : '-'
   const endLabel = end ? `${end.lat.toFixed(5)}, ${end.lng.toFixed(5)}` : '-'
@@ -242,13 +330,23 @@ export default function UserMapPage() {
         {/* PANEL */}
         <div
           className="bg-white lg:shadow-lg w-full lg:w-[420px] border-b lg:border-b-0 lg:border-r border-gray-200"
-          style={{
-            // Mobile: panel max 45vh, Desktop: full height
-            maxHeight: '45vh'
-          }}
+          style={{ maxHeight: '45vh' }}
         >
           <div className="p-4 md:p-6 overflow-y-auto max-h-[45vh] lg:max-h-none lg:h-full" style={{ height: desktopH }}>
             <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Route Finder</h3>
+
+            {/* Loading banner untuk bootstrap */}
+            {loadingBootstrap ? (
+              <div className="mb-4 text-sm text-gray-700">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="font-semibold text-blue-900 mb-1">Memuat data peta…</p>
+                  <ul className="list-disc ml-5 space-y-1">
+                    <li>{loadingEvents ? 'Memuat event…' : 'Event siap'}</li>
+                    <li>{loadingClosures ? 'Memuat rekayasa jalan…' : 'Rekayasa jalan siap'}</li>
+                  </ul>
+                </div>
+              </div>
+            ) : null}
 
             <div className="text-sm text-gray-700 mb-4">
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
@@ -359,12 +457,12 @@ export default function UserMapPage() {
 
             <button
               onClick={() => findRoute()}
-              disabled={loading || !canFindRoute}
+              disabled={loadingRoute || !canFindRoute}
               className={`w-full px-3 py-3 font-bold text-white text-sm rounded-lg transition ${
-                loading || !canFindRoute ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#8b1a1a] hover:bg-[#6b1414]'
+                loadingRoute || !canFindRoute ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#8b1a1a] hover:bg-[#6b1414]'
               }`}
             >
-              {loading ? 'Menghitung Rute...' : 'Cari Rute (A*)'}
+              {loadingRoute ? 'Menghitung Rute...' : 'Cari Rute (A*)'}
             </button>
 
             <div className="mt-4 text-xs text-gray-700 bg-orange-50 p-3 rounded-lg border border-orange-200">
@@ -373,6 +471,9 @@ export default function UserMapPage() {
                 <span className="inline-block w-3 h-3 bg-red-500 rounded" />
                 <span>Jalan ditutup (rekayasa)</span>
               </p>
+              {loadingClosures ? (
+                <p className="mt-2 text-[11px] text-orange-900/80">Memuat rekayasa jalan...</p>
+              ) : null}
             </div>
           </div>
         </div>
