@@ -6,7 +6,8 @@ import {
   Popup,
   Polyline,
   useMapEvents,
-  CircleMarker
+  CircleMarker,
+  Tooltip
 } from 'react-leaflet'
 import L from 'leaflet'
 import dayjs from 'dayjs'
@@ -14,8 +15,16 @@ import { api } from '../../lib/api.js'
 
 const DEFAULT_CENTER = [-7.871, 111.462]
 const OFF_ROUTE_TOLERANCE_M = 35
-const NAVBAR_H_PX = 80 
+const NAVBAR_H_PX = 80
 const CLOSURES_TTL_MS = 30 * 1000
+
+// turn-by-turn settings
+const STEP_TRIGGER_M = 25
+const STREET_FETCH_MIN_MS = 3000 // throttle "kamu sedang di jalan apa"
+
+// smooth follow
+const FOLLOW_ZOOM = 18
+const FOLLOW_FLY_DURATION = 0.65 // seconds
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -70,11 +79,55 @@ function distanceToPolylineM(point, polyline) {
   return best
 }
 
-function MapBadge({ tracking, followMe }) {
+// ===== helper: haversine distance (untuk jarak ke step) =====
+function haversineM(a, b) {
+  if (!a || !b) return Infinity
+  const R = 6371000
+  const toRad = (x) => (x * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const lat1 = toRad(a.lat)
+  const lat2 = toRad(b.lat)
+
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
+
+  return 2 * R * Math.asin(Math.sqrt(x))
+}
+
+function bearingDeg(a, b) {
+  if (!a || !b) return 0
+  const toRad = (x) => (x * Math.PI) / 180
+  const toDeg = (x) => (x * 180) / Math.PI
+  const lat1 = toRad(a.lat)
+  const lat2 = toRad(b.lat)
+  const dLon = toRad(b.lng - a.lng)
+
+  const y = Math.sin(dLon) * Math.cos(lat2)
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
+  const brng = toDeg(Math.atan2(y, x))
+  return (brng + 360) % 360
+}
+
+// ===== helpers: format =====
+function fmtMin(sec) {
+  if (sec == null || Number.isNaN(Number(sec))) return '?'
+  const mins = Number(sec) / 60
+  return mins < 10 ? `${mins.toFixed(1)} menit` : `${mins.toFixed(0)} menit`
+}
+function fmtKm(m) {
+  if (m == null || Number.isNaN(Number(m))) return '?'
+  const km = Number(m) / 1000
+  return km < 10 ? `${km.toFixed(2)} km` : `${km.toFixed(1)} km`
+}
+
+// ===== UI small components =====
+function MapBadge({ tracking, followMe, voiceOn }) {
   return (
     <div className="absolute top-3 left-3 z-[1000] pointer-events-none">
       <div className="bg-white/95 backdrop-blur border border-gray-200 shadow-sm rounded-xl px-3 py-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span
             className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
               tracking
@@ -84,6 +137,7 @@ function MapBadge({ tracking, followMe }) {
           >
             {tracking ? 'NAVIGASI AKTIF' : 'NAVIGASI OFF'}
           </span>
+
           <span
             className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
               followMe
@@ -93,10 +147,117 @@ function MapBadge({ tracking, followMe }) {
           >
             Ikuti: {followMe ? 'ON' : 'OFF'}
           </span>
+
+          <span
+            className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+              voiceOn
+                ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                : 'bg-white text-gray-700 border-gray-200'
+            }`}
+          >
+            Suara: {voiceOn ? 'ON' : 'OFF'}
+          </span>
         </div>
       </div>
     </div>
   )
+}
+
+function InstructionOverlay({ tracking, activeStep, distToNext }) {
+  if (!tracking || !activeStep) return null
+  return (
+    <div className="absolute top-3 right-3 left-3 sm:left-auto z-[1000] pointer-events-none">
+      <div className="bg-emerald-50/95 backdrop-blur border border-emerald-200 shadow-sm rounded-xl px-3 py-2">
+        <p className="text-[11px] font-semibold text-emerald-900 mb-0.5">Instruksi</p>
+        <p className="text-sm font-bold text-emerald-900 leading-snug">{activeStep.instruction}</p>
+        {distToNext != null ? (
+          <p className="mt-1 text-[11px] text-emerald-900/80">
+            Jarak ke instruksi berikutnya: <b>{distToNext} m</b>
+          </p>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+// Simulasi lane guidance (bukan lane nyata)
+function LaneSim({ step }) {
+  if (!step) return null
+  const t = (step.type || '').toLowerCase()
+
+  // lanes: [left, straight, right] with one highlighted
+  let active = 'straight'
+  if (t.includes('left')) active = 'left'
+  else if (t.includes('right')) active = 'right'
+  else active = 'straight'
+
+  const Lane = ({ kind, label }) => (
+    <div
+      className={`flex-1 flex flex-col items-center justify-center border rounded-lg py-2 ${
+        active === kind ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200'
+      }`}
+    >
+      <div className="text-xs font-bold">{label}</div>
+      <div className="text-[10px] opacity-80">{active === kind ? 'disarankan' : ''}</div>
+    </div>
+  )
+
+  return (
+    <div className="mt-2">
+      <p className="text-[11px] font-semibold text-gray-700 mb-1">Simulasi lajur</p>
+      <div className="flex gap-2">
+        <Lane kind="left" label="Kiri" />
+        <Lane kind="straight" label="Lurus" />
+        <Lane kind="right" label="Kanan" />
+      </div>
+      <p className="mt-1 text-[10px] text-gray-500">
+        *Simulasi berdasarkan manuver (turn-by-turn), bukan data lajur asli.
+      </p>
+    </div>
+  )
+}
+
+// user direction arrow marker icon
+function makeArrowIcon(deg) {
+  const d = Number.isFinite(deg) ? deg : 0
+  return L.divIcon({
+    className: '',
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    html: `
+      <div style="
+        width:36px;height:36px;border-radius:18px;
+        background:rgba(37,99,235,0.15);
+        display:flex;align-items:center;justify-content:center;
+        border:2px solid rgba(37,99,235,0.65);
+        box-shadow:0 2px 8px rgba(0,0,0,0.15);
+      ">
+        <div style="
+          width:0;height:0;
+          border-left:7px solid transparent;
+          border-right:7px solid transparent;
+          border-bottom:16px solid rgba(37,99,235,0.95);
+          transform:rotate(${d}deg);
+          transform-origin:50% 70%;
+        "></div>
+      </div>
+    `
+  })
+}
+
+// Speech helper
+function speak(text, { rate = 1.0, pitch = 1.0, lang = 'id-ID' } = {}) {
+  try {
+    if (!('speechSynthesis' in window)) return
+    const u = new SpeechSynthesisUtterance(text)
+    u.lang = lang
+    u.rate = rate
+    u.pitch = pitch
+    window.speechSynthesis.cancel()
+    window.speechSynthesis.speak(u)
+  } catch {
+    // ignore
+  }
 }
 
 export default function UserMapPage() {
@@ -106,21 +267,36 @@ export default function UserMapPage() {
 
   const [start, setStart] = React.useState(null)
   const [end, setEnd] = React.useState(null)
-  const [route, setRoute] = React.useState(null)
   const [pickMode, setPickMode] = React.useState('start')
+
+  // NEW: two routes
+  const [routes, setRoutes] = React.useState({ fastest: null, shortest: null })
+  const [selectedMode, setSelectedMode] = React.useState('fastest') // default tetap seperti sistem lama: fastest
+  const activeRoute = routes?.[selectedMode] || null
+
+  // turn-by-turn state
+  const [steps, setSteps] = React.useState([])
+  const [stepIdx, setStepIdx] = React.useState(0)
+  const [currentStreet, setCurrentStreet] = React.useState('')
 
   // loading granular
   const [loadingBootstrap, setLoadingBootstrap] = React.useState(true)
   const [loadingEvents, setLoadingEvents] = React.useState(true)
   const [loadingClosures, setLoadingClosures] = React.useState(true)
-
   const [loadingRoute, setLoadingRoute] = React.useState(false)
+
   const [msg, setMsg] = React.useState('Pilih START dan TUJUAN, lalu tekan "Cari Rute".')
 
   const [myPos, setMyPos] = React.useState(null)
   const [geoErr, setGeoErr] = React.useState('')
   const [tracking, setTracking] = React.useState(false)
   const [followMe, setFollowMe] = React.useState(true)
+
+  // NEW: voice + bearing
+  const [voiceOn, setVoiceOn] = React.useState(true)
+  const [bearing, setBearing] = React.useState(0)
+  const lastPosRef = React.useRef(null)
+  const lastSpokenStepRef = React.useRef({ idx: -1, ts: 0 })
 
   const mapRef = React.useRef(null)
   const watchIdRef = React.useRef(null)
@@ -131,11 +307,13 @@ export default function UserMapPage() {
     fetchedAt: 0
   })
 
-  const desktopH = `calc(100vh - ${NAVBAR_H_PX}px)`
+  // throttle street fetch
+  const lastStreetFetchRef = React.useRef(0)
 
-  // =========================
+  const desktopH = `calc(100vh - ${NAVBAR_H_PX}px)`
+  const isMobile = typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+
   // BOOTSTRAP: 1x fetch
-  // =========================
   React.useEffect(() => {
     let alive = true
 
@@ -209,7 +387,6 @@ export default function UserMapPage() {
     setLoadingClosures(true)
 
     try {
-      // ambil closures_active dari /map_bootstrap
       const res = await api.get('/map_bootstrap')
       const data = res.data || {}
       const cl = Array.isArray(data.closures_active) ? data.closures_active : []
@@ -217,13 +394,15 @@ export default function UserMapPage() {
       setClosures(cl)
       closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
     } catch (e) {
-      // refresh gagal jangan mematikan map
       console.warn('refreshClosures failed:', e)
     } finally {
       setLoadingClosures(false)
     }
   }
 
+  // =========================
+  // ROUTING (2 alternatif)
+  // =========================
   async function findRoute(customStart, customEnd, { silent = false } = {}) {
     const s = customStart || start
     const e = customEnd || end
@@ -233,13 +412,36 @@ export default function UserMapPage() {
     }
 
     setLoadingRoute(true)
-    if (!silent) setMsg('Menghitung rute A*...')
-    setRoute(null)
+    if (!silent) setMsg('Menghitung rute A* (tercepat & terpendek)...')
+
+    // reset
+    setRoutes({ fastest: null, shortest: null })
+    setSteps([])
+    setStepIdx(0)
 
     try {
-      const res = await api.post('/route', { start: s, end: e })
-      setRoute(res.data)
-      if (!silent) setMsg(`Rute ditemukan. Estimasi ${(res.data.total_time_sec / 60).toFixed(1)} menit.`)
+      // backend mendukung mode:"both"
+      const res = await api.post('/route', { start: s, end: e, mode: 'both' })
+      const data = res.data || {}
+
+      const fastest = data.fastest || null
+      const shortest = data.shortest || null
+
+      // simpan rute
+      setRoutes({ fastest, shortest })
+
+      // pilih default: fastest (agar tidak mengubah sistem lama)
+      const nextMode = selectedMode || 'fastest'
+      const chosen = (nextMode === 'shortest' ? shortest : fastest) || fastest || shortest
+      if (chosen) {
+        setSteps(Array.isArray(chosen.steps) ? chosen.steps : [])
+        setStepIdx(0)
+      }
+
+      if (!silent) {
+        const mins = chosen?.total_time_sec ? (chosen.total_time_sec / 60).toFixed(1) : '?'
+        setMsg(`Rute ditemukan. Estimasi ${mins} menit. Pilih alternatif rute.`)
+      }
 
       // requirement: closures refresh setiap selesai cari rute
       await refreshClosures({ force: true, silent: true })
@@ -247,6 +449,27 @@ export default function UserMapPage() {
       if (!silent) setMsg('Gagal: ' + (e2?.response?.data?.error || e2.message))
     } finally {
       setLoadingRoute(false)
+    }
+  }
+
+  // reroute khusus mode yang sedang dipilih (lebih cepat dibanding hitung both)
+  async function rerouteSelected(customStart, customEnd) {
+    const s = customStart || start
+    const e = customEnd || end
+    if (!s || !e) return
+    try {
+      const res = await api.post('/route', { start: s, end: e, mode: selectedMode })
+      const r = res.data || null
+      if (!r) return
+
+      setRoutes((prev) => ({ ...prev, [selectedMode]: r }))
+      setSteps(Array.isArray(r.steps) ? r.steps : [])
+      setStepIdx(0)
+
+      await refreshClosures({ force: true, silent: true })
+    } catch (err) {
+      // silent
+      console.warn('rerouteSelected failed:', err)
     }
   }
 
@@ -273,11 +496,28 @@ export default function UserMapPage() {
     if (!navigator.geolocation) return setGeoErr('Browser tidak mendukung Geolocation.')
     if (watchIdRef.current != null) return
 
+    // reset last bearing reference
+    lastPosRef.current = null
+
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude }
         setMyPos(pt)
-        if (followMe && mapRef.current) mapRef.current.setView([pt.lat, pt.lng], mapRef.current.getZoom())
+
+        // bearing: prefer device heading if available
+        if (Number.isFinite(pos.coords.heading) && pos.coords.heading != null) {
+          setBearing((pos.coords.heading + 360) % 360)
+        } else {
+          const prev = lastPosRef.current
+          if (prev) setBearing(bearingDeg(prev, pt))
+        }
+        lastPosRef.current = pt
+
+        // Smooth camera follow
+        if (followMe && mapRef.current) {
+          const z = tracking ? Math.max(mapRef.current.getZoom(), FOLLOW_ZOOM) : mapRef.current.getZoom()
+          mapRef.current.flyTo([pt.lat, pt.lng], z, { animate: true, duration: FOLLOW_FLY_DURATION })
+        }
       },
       (err) => setGeoErr(err.message || 'Navigasi gagal (GPS).'),
       { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 }
@@ -298,18 +538,76 @@ export default function UserMapPage() {
 
   React.useEffect(() => () => stopTracking(), [])
 
-  // off-route -> reroute otomatis
+  // Saat user pilih mode (dan tidak tracking), update steps ke mode itu
+  React.useEffect(() => {
+    if (tracking) return
+    const r = routes?.[selectedMode]
+    if (!r) return
+    setSteps(Array.isArray(r.steps) ? r.steps : [])
+    setStepIdx(0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMode])
+
+  // TURN BY TURN: auto advance step
   React.useEffect(() => {
     if (!tracking) return
-    if (!myPos || !end || !route?.polyline) return
-    const d = distanceToPolylineM(myPos, route.polyline)
-    if (d > OFF_ROUTE_TOLERANCE_M) findRoute(myPos, end, { silent: true })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!myPos || steps.length < 2) return
+    if (stepIdx >= steps.length - 1) return
+
+    const next = steps[stepIdx + 1]
+    if (!next?.location) return
+
+    const d = haversineM(myPos, next.location)
+    if (d <= STEP_TRIGGER_M) {
+      setStepIdx((i) => Math.min(i + 1, steps.length - 1))
+    }
+  }, [tracking, myPos?.lat, myPos?.lng, steps, stepIdx])
+
+  // VOICE NAV: speak when step changes (throttled)
+  React.useEffect(() => {
+    if (!tracking) return
+    if (!voiceOn) return
+    const st = steps?.[stepIdx]
+    if (!st?.instruction) return
+
+    const now = Date.now()
+    const last = lastSpokenStepRef.current
+    if (last.idx === stepIdx && now - last.ts < 5000) return
+
+    lastSpokenStepRef.current = { idx: stepIdx, ts: now }
+    speak(st.instruction, { rate: 1.02, pitch: 1.0, lang: 'id-ID' })
+  }, [tracking, voiceOn, stepIdx, steps])
+
+  // TURN BY TURN: current street (optional)
+  React.useEffect(() => {
+    if (!tracking) return
+    if (!myPos) return
+    const now = Date.now()
+    if (now - lastStreetFetchRef.current < STREET_FETCH_MIN_MS) return
+    lastStreetFetchRef.current = now
+
+    ;(async () => {
+      try {
+        const res = await api.get(`/nearest_street?lat=${myPos.lat}&lng=${myPos.lng}`)
+        setCurrentStreet(res?.data?.street_name || '')
+      } catch {
+        // ignore (kalau endpoint tidak ada pun tidak merusak)
+      }
+    })()
   }, [tracking, myPos?.lat, myPos?.lng])
 
-  // =========================
+  // off-route -> reroute otomatis (tetap)
+  React.useEffect(() => {
+    if (!tracking) return
+    if (!myPos || !end || !activeRoute?.polyline) return
+    const d = distanceToPolylineM(myPos, activeRoute.polyline)
+    if (d > OFF_ROUTE_TOLERANCE_M) {
+      rerouteSelected(myPos, end)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracking, myPos?.lat, myPos?.lng, selectedMode])
+
   // requirement: closures refresh tiap 30 detik saat navigasi aktif
-  // =========================
   React.useEffect(() => {
     if (!tracking) return
 
@@ -324,15 +622,33 @@ export default function UserMapPage() {
   const endLabel = end ? `${end.lat.toFixed(5)}, ${end.lng.toFixed(5)}` : '-'
   const canFindRoute = !!start && !!end
 
+  const activeStep = steps?.[stepIdx]
+  const nextStep = steps?.[stepIdx + 1]
+  const distToNext =
+    myPos && nextStep?.location ? Math.round(haversineM(myPos, nextStep.location)) : null
+
+  // responsive heights: saat tracking di HP, map lebih besar
+  const panelMobileH = tracking ? '35vh' : '45vh'
+  const mapMobileH = tracking ? '65vh' : '55vh'
+
+  const fastest = routes.fastest
+  const shortest = routes.shortest
+  const hasRoutes = !!fastest || !!shortest
+
+  const lockPickRoute = tracking // lock pilihan rute saat navigasi
+
   return (
     <div className="bg-gray-50">
       <div className="flex flex-col lg:flex-row w-full">
         {/* PANEL */}
         <div
           className="bg-white lg:shadow-lg w-full lg:w-[420px] border-b lg:border-b-0 lg:border-r border-gray-200"
-          style={{ maxHeight: '45vh' }}
+          style={{ maxHeight: isMobile ? panelMobileH : undefined }}
         >
-          <div className="p-4 md:p-6 overflow-y-auto max-h-[45vh] lg:max-h-none lg:h-full" style={{ height: desktopH }}>
+          <div
+            className="p-4 md:p-6 overflow-y-auto lg:h-full"
+            style={{ height: isMobile ? panelMobileH : desktopH }}
+          >
             <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Route Finder</h3>
 
             {/* Loading banner untuk bootstrap */}
@@ -354,11 +670,117 @@ export default function UserMapPage() {
                 <ol className="list-decimal ml-5 space-y-1">
                   <li>Tentukan <b>START</b> dan <b>TUJUAN</b>.</li>
                   <li>Tekan <b>Cari Rute</b>.</li>
+                  <li>Pilih <b>Tercepat</b> / <b>Terpendek</b>.</li>
                   <li>Tekan <b>Mulai Navigasi</b>.</li>
                 </ol>
                 <p className="mt-2 text-gray-600">{msg}</p>
               </div>
             </div>
+
+            {/* TURN BY TURN UI (panel) */}
+            {tracking && (activeStep || currentStreet) ? (
+              <div className="mb-4">
+                {currentStreet ? (
+                  <div className="text-xs text-gray-800 bg-white border border-gray-200 rounded-lg p-2 mb-2">
+                    Kamu sedang di: <b>{currentStreet}</b>
+                  </div>
+                ) : null}
+
+                {activeStep ? (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                    <p className="text-xs font-semibold text-emerald-900 mb-1">Instruksi</p>
+                    <p className="text-sm font-bold text-emerald-900">{activeStep.instruction}</p>
+                    {distToNext != null ? (
+                      <p className="mt-1 text-xs text-emerald-800">
+                        Jarak ke instruksi berikutnya: <b>{distToNext} m</b>
+                      </p>
+                    ) : null}
+                    <p className="mt-1 text-[11px] text-emerald-900/70">
+                      Step {Math.min(stepIdx + 1, steps.length)} / {steps.length || 0}
+                    </p>
+
+                    {/* Lane simulation (panel) */}
+                    <LaneSim step={activeStep} />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* PILIH RUTE (mirip Google Maps) */}
+            {hasRoutes ? (
+              <div className="mb-4">
+                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-bold text-gray-900">Alternatif Rute</p>
+                    {lockPickRoute ? (
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-700">
+                        terkunci saat navigasi
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-1 gap-2">
+                    {/* FASTEST */}
+                    <button
+                      type="button"
+                      disabled={!fastest || lockPickRoute}
+                      onClick={() => {
+                        setSelectedMode('fastest')
+                        if (fastest) {
+                          setSteps(Array.isArray(fastest.steps) ? fastest.steps : [])
+                          setStepIdx(0)
+                        }
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg border transition ${
+                        selectedMode === 'fastest'
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'bg-white text-gray-900 border-gray-200 hover:bg-gray-50'
+                      } ${(!fastest || lockPickRoute) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold">Rute Tercepat</div>
+                        <div className="text-xs font-semibold">{fmtMin(fastest?.total_time_sec)}</div>
+                      </div>
+                      <div className="text-xs opacity-80">{fmtKm(fastest?.total_length_m)}</div>
+                      <div className="mt-1 text-[11px] opacity-80">
+                        {selectedMode === 'fastest' ? 'Dipilih' : 'Klik untuk memilih'}
+                      </div>
+                    </button>
+
+                    {/* SHORTEST */}
+                    <button
+                      type="button"
+                      disabled={!shortest || lockPickRoute}
+                      onClick={() => {
+                        setSelectedMode('shortest')
+                        if (shortest) {
+                          setSteps(Array.isArray(shortest.steps) ? shortest.steps : [])
+                          setStepIdx(0)
+                        }
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg border transition ${
+                        selectedMode === 'shortest'
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'bg-white text-gray-900 border-gray-200 hover:bg-gray-50'
+                      } ${(!shortest || lockPickRoute) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold">Rute Terpendek</div>
+                        <div className="text-xs font-semibold">{fmtMin(shortest?.total_time_sec)}</div>
+                      </div>
+                      <div className="text-xs opacity-80">{fmtKm(shortest?.total_length_m)}</div>
+                      <div className="mt-1 text-[11px] opacity-80">
+                        {selectedMode === 'shortest' ? 'Dipilih' : 'Klik untuk memilih'}
+                      </div>
+                    </button>
+                  </div>
+
+                  <p className="mt-2 text-[11px] text-gray-600">
+                    Rute terpilih akan dipakai untuk navigasi dan reroute otomatis.
+                  </p>
+                </div>
+              </div>
+            ) : null}
 
             <hr className="my-3 border-gray-200" />
 
@@ -424,8 +846,13 @@ export default function UserMapPage() {
               <div className="flex gap-2 mt-2">
                 <button
                   onClick={() => (tracking ? stopTracking() : startTracking())}
+                  disabled={!activeRoute && !tracking} // butuh rute terpilih untuk mulai navigasi
                   className={`flex-1 px-3 py-2 rounded-lg font-bold text-sm transition ${
-                    tracking ? 'bg-gray-900 hover:bg-gray-950 text-white' : 'bg-[#8b1a1a] hover:bg-[#6b1414] text-white'
+                    (!activeRoute && !tracking)
+                      ? 'bg-gray-400 cursor-not-allowed text-white'
+                      : tracking
+                        ? 'bg-gray-900 hover:bg-gray-950 text-white'
+                        : 'bg-[#8b1a1a] hover:bg-[#6b1414] text-white'
                   }`}
                 >
                   {tracking ? 'Stop Navigasi' : 'Mulai Navigasi'}
@@ -440,6 +867,34 @@ export default function UserMapPage() {
                   }`}
                 >
                   Ikuti Saya: {followMe ? 'ON' : 'OFF'}
+                </button>
+              </div>
+
+              {/* Voice toggle */}
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => setVoiceOn((v) => !v)}
+                  className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm border transition ${
+                    voiceOn
+                      ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                      : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Suara: {voiceOn ? 'ON' : 'OFF'}
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (tracking && activeStep?.instruction) speak(activeStep.instruction, { lang: 'id-ID' })
+                  }}
+                  disabled={!tracking || !activeStep?.instruction || !voiceOn}
+                  className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm border transition ${
+                    (!tracking || !activeStep?.instruction || !voiceOn)
+                      ? 'bg-gray-200 text-gray-500 border-gray-200 cursor-not-allowed'
+                      : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Ulangi Instruksi
                 </button>
               </div>
 
@@ -480,26 +935,46 @@ export default function UserMapPage() {
 
         {/* MAP */}
         <div className="relative w-full flex-1 bg-white lg:shadow-lg">
-          <div className="h-[55vh] lg:h-[calc(100vh-80px)]">
-            <MapBadge tracking={tracking} followMe={followMe} />
+          <div className="relative" style={{ height: isMobile ? mapMobileH : 'calc(100vh - 80px)' }}>
+            <MapBadge tracking={tracking} followMe={followMe} voiceOn={voiceOn} />
+            <InstructionOverlay tracking={tracking} activeStep={activeStep} distToNext={distToNext} />
+
             <MapContainer
               center={DEFAULT_CENTER}
               zoom={13}
               style={{ height: '100%', width: '100%' }}
               whenCreated={(map) => { mapRef.current = map }}
             >
-              <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <TileLayer
+                attribution="&copy; OpenStreetMap contributors"
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
               <ClickSetter mode={pickMode} onPick={onPick} />
 
+              {/* my position: arrow bearing */}
               {myPos && (
-                <CircleMarker center={[myPos.lat, myPos.lng]} radius={8} pathOptions={{ color: '#2563eb' }}>
-                  <Popup>Posisi Saya</Popup>
-                </CircleMarker>
+                <>
+                  <Marker position={[myPos.lat, myPos.lng]} icon={makeArrowIcon(bearing)}>
+                    <Popup>
+                      <b>Posisi Saya</b>
+                      <br />
+                      Bearing: {Math.round(bearing)}°
+                    </Popup>
+                  </Marker>
+
+                  {/* fallback circle for visibility */}
+                  <CircleMarker center={[myPos.lat, myPos.lng]} radius={6} pathOptions={{ color: '#2563eb' }}>
+                    <Tooltip direction="top" offset={[0, -8]} opacity={0.9}>
+                      Saya
+                    </Tooltip>
+                  </CircleMarker>
+                </>
               )}
 
               {start && <Marker position={[start.lat, start.lng]}><Popup>Start</Popup></Marker>}
               {end && <Marker position={[end.lat, end.lng]}><Popup>Tujuan</Popup></Marker>}
 
+              {/* closures merah */}
               {closures.flatMap((c) =>
                 (c.edges || []).map((e, idx) =>
                   Array.isArray(e.polyline) && e.polyline.length > 1 ? (
@@ -517,12 +992,47 @@ export default function UserMapPage() {
                 )
               )}
 
-              {route?.polyline && (
+              {/* Rute alternatif: dipilih tebal, lainnya tipis */}
+              {routes.fastest?.polyline && (
                 <Polyline
-                  positions={route.polyline.map((p) => [p.lat, p.lng])}
-                  pathOptions={{ color: '#111', weight: 5 }}
-                />
+                  positions={routes.fastest.polyline.map((p) => [p.lat, p.lng])}
+                  pathOptions={{
+                    color: '#111',
+                    weight: selectedMode === 'fastest' ? 6 : 3,
+                    opacity: selectedMode === 'fastest' ? 1 : 0.35
+                  }}
+                >
+                  <Tooltip sticky>Tercepat</Tooltip>
+                </Polyline>
               )}
+
+              {routes.shortest?.polyline && (
+                <Polyline
+                  positions={routes.shortest.polyline.map((p) => [p.lat, p.lng])}
+                  pathOptions={{
+                    color: '#111',
+                    weight: selectedMode === 'shortest' ? 6 : 3,
+                    opacity: selectedMode === 'shortest' ? 1 : 0.35,
+                    dashArray: selectedMode === 'shortest' ? undefined : '6 10'
+                  }}
+                >
+                  <Tooltip sticky>Terpendek</Tooltip>
+                </Polyline>
+              )}
+
+              {/* marker step berikutnya */}
+              {tracking && nextStep?.location ? (
+                <CircleMarker
+                  center={[nextStep.location.lat, nextStep.location.lng]}
+                  radius={6}
+                  pathOptions={{ color: '#10b981' }}
+                >
+                  <Popup>
+                    <b>Step berikutnya</b><br />
+                    {nextStep.instruction || '-'}
+                  </Popup>
+                </CircleMarker>
+              ) : null}
             </MapContainer>
           </div>
         </div>
