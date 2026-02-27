@@ -24,7 +24,11 @@ const STREET_FETCH_MIN_MS = 3000 // throttle "kamu sedang di jalan apa"
 
 // smooth follow
 const FOLLOW_ZOOM = 18
-const FOLLOW_FLY_DURATION = 0.65 // seconds
+const FOLLOW_FLY_DURATION = 0.65 
+
+// reverse geocoding (OSM/Nominatim)
+const REVERSE_GEO_TTL_MS = 24 * 60 * 60 * 1000 
+const REVERSE_GEO_TIMEOUT_MS = 9000
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -260,6 +264,26 @@ function speak(text, { rate = 1.0, pitch = 1.0, lang = 'id-ID' } = {}) {
   }
 }
 
+// ===== helper: simple timeout fetch (reverse geocoding) =====
+async function fetchWithTimeout(url, { timeoutMs = 8000, signal, headers } = {}) {
+  const ctrl = new AbortController()
+  const id = setTimeout(() => ctrl.abort(), timeoutMs)
+
+  const onAbort = () => ctrl.abort()
+  if (signal) {
+    if (signal.aborted) ctrl.abort()
+    signal.addEventListener('abort', onAbort, { once: true })
+  }
+
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, headers })
+    return res
+  } finally {
+    clearTimeout(id)
+    if (signal) signal.removeEventListener('abort', onAbort)
+  }
+}
+
 export default function UserMapPage() {
   const [events, setEvents] = React.useState([])
   const [closures, setClosures] = React.useState([])
@@ -269,7 +293,11 @@ export default function UserMapPage() {
   const [end, setEnd] = React.useState(null)
   const [pickMode, setPickMode] = React.useState('start')
 
-  // NEW: two routes
+  // (reverse geocoding labels)
+  const [startAddr, setStartAddr] = React.useState('')
+  const [endAddr, setEndAddr] = React.useState('')
+
+  // two routes
   const [routes, setRoutes] = React.useState({ fastest: null, shortest: null })
   const [selectedMode, setSelectedMode] = React.useState('fastest') // default tetap seperti sistem lama: fastest
   const activeRoute = routes?.[selectedMode] || null
@@ -292,7 +320,7 @@ export default function UserMapPage() {
   const [tracking, setTracking] = React.useState(false)
   const [followMe, setFollowMe] = React.useState(true)
 
-  // NEW: voice + bearing
+  // voice + bearing
   const [voiceOn, setVoiceOn] = React.useState(true)
   const [bearing, setBearing] = React.useState(0)
   const lastPosRef = React.useRef(null)
@@ -310,8 +338,82 @@ export default function UserMapPage() {
   // throttle street fetch
   const lastStreetFetchRef = React.useRef(0)
 
+  // reverse geocode cache + abort (biar hemat request & tidak tabrakan)
+  const reverseCacheRef = React.useRef(new Map()) // key -> { label, ts }
+  const reverseAbortRef = React.useRef({ start: null, end: null })
+
   const desktopH = `calc(100vh - ${NAVBAR_H_PX}px)`
   const isMobile = typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+
+  // Reverse Geocoding (OSM)
+  function roundKey(lat, lng) {
+    // 5 desimal ~ 1 meter-an (cukup untuk cache)
+    return `${lat.toFixed(5)},${lng.toFixed(5)}`
+  }
+
+  async function reverseGeocodeOSM(lat, lng, { signal } = {}) {
+    const key = roundKey(lat, lng)
+    const now = Date.now()
+    const cached = reverseCacheRef.current.get(key)
+    if (cached && now - cached.ts < REVERSE_GEO_TTL_MS) return cached.label
+
+    const url =
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2` +
+      `&lat=${encodeURIComponent(lat)}` +
+      `&lon=${encodeURIComponent(lng)}` +
+      `&zoom=18&addressdetails=1`
+
+    // Nominatim menyarankan identitas aplikasi. Di browser kita tidak bisa set User-Agent,
+    // jadi pakai parameter email opsional kalau mau. (Tidak wajib.)
+    // contoh tambah: + `&email=youremail@example.com`
+
+    const res = await fetchWithTimeout(url, {
+      timeoutMs: REVERSE_GEO_TIMEOUT_MS,
+      signal,
+      headers: {
+        Accept: 'application/json'
+      }
+    })
+
+    if (!res.ok) throw new Error('reverse geocode failed')
+    const data = await res.json()
+    const label = data?.display_name || ''
+    if (label) reverseCacheRef.current.set(key, { label, ts: now })
+    return label
+  }
+
+  async function fillAddressFor(mode, latlng) {
+    if (!latlng) return
+    const { lat, lng } = latlng
+
+    // batalkan request lama utk mode yang sama
+    try {
+      if (reverseAbortRef.current[mode]) reverseAbortRef.current[mode].abort()
+    } catch {
+      // ignore
+    }
+    const ctrl = new AbortController()
+    reverseAbortRef.current[mode] = ctrl
+
+    // optimistik: tampilkan koordinat dulu agar UI tidak kosong
+    const fallback = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    if (mode === 'start') setStartAddr(fallback)
+    else setEndAddr(fallback)
+
+    try {
+      const label = await reverseGeocodeOSM(lat, lng, { signal: ctrl.signal })
+      if (ctrl.signal.aborted) return
+
+      // set label kalau ada, kalau kosong fallback
+      if (mode === 'start') setStartAddr(label || fallback)
+      else setEndAddr(label || fallback)
+    } catch (e) {
+      if (ctrl.signal?.aborted) return
+      // fallback tetap koordinat (tidak merusak fitur)
+      if (mode === 'start') setStartAddr(fallback)
+      else setEndAddr(fallback)
+    }
+  }
 
   // BOOTSTRAP: 1x fetch
   React.useEffect(() => {
@@ -358,22 +460,27 @@ export default function UserMapPage() {
     if (mode === 'start') {
       setStart(latlng)
       setMsg('START tersimpan. Sekarang pilih TUJUAN.')
+      // reverse geocoding start
+      fillAddressFor('start', latlng)
     } else {
       setEnd(latlng)
       setMsg('TUJUAN tersimpan. Tekan "Cari Rute".')
+      // reverse geocoding end
+      fillAddressFor('end', latlng)
     }
   }
 
   function applyEventAsDestination() {
     const ev = events.find((e) => e.id === selectedEventId)
     if (!ev) return
-    setEnd({ lat: ev.lat, lng: ev.lng })
+    const pt = { lat: ev.lat, lng: ev.lng }
+    setEnd(pt)
     setMsg(`Tujuan di-set ke event: ${ev.name}. Tekan "Cari Rute".`)
+    // reverse geocoding end
+    fillAddressFor('end', pt)
   }
 
-  // =========================
   // Closures Refresh + Cache
-  // =========================
   async function refreshClosures({ force = false, silent = true } = {}) {
     const cache = closuresCacheRef.current
     const stillValid = cache.data && Date.now() - cache.fetchedAt < CLOSURES_TTL_MS
@@ -400,9 +507,7 @@ export default function UserMapPage() {
     }
   }
 
-  // =========================
   // ROUTING (2 alternatif)
-  // =========================
   async function findRoute(customStart, customEnd, { silent = false } = {}) {
     const s = customStart || start
     const e = customEnd || end
@@ -485,6 +590,9 @@ export default function UserMapPage() {
         setPickMode('end')
         setMsg('Lokasi kamu dipakai sebagai START. Sekarang pilih TUJUAN.')
         if (followMe && mapRef.current) mapRef.current.setView([pt.lat, pt.lng], 16)
+
+        // reverse geocoding start
+        fillAddressFor('start', pt)
       },
       (err) => setGeoErr(err.message || 'Gagal mengambil lokasi'),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
@@ -496,7 +604,6 @@ export default function UserMapPage() {
     if (!navigator.geolocation) return setGeoErr('Browser tidak mendukung Geolocation.')
     if (watchIdRef.current != null) return
 
-    // reset last bearing reference
     lastPosRef.current = null
 
     watchIdRef.current = navigator.geolocation.watchPosition(
@@ -591,7 +698,6 @@ export default function UserMapPage() {
         const res = await api.get(`/nearest_street?lat=${myPos.lat}&lng=${myPos.lng}`)
         setCurrentStreet(res?.data?.street_name || '')
       } catch {
-        // ignore (kalau endpoint tidak ada pun tidak merusak)
       }
     })()
   }, [tracking, myPos?.lat, myPos?.lng])
@@ -618,8 +724,19 @@ export default function UserMapPage() {
     return () => clearInterval(id)
   }, [tracking])
 
-  const startLabel = start ? `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}` : '-'
-  const endLabel = end ? `${end.lat.toFixed(5)}, ${end.lng.toFixed(5)}` : '-'
+  // LABEL: tampilkan alamat (fallback: koordinat)
+  const startLabel = startAddr
+    ? startAddr
+    : start
+      ? `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}`
+      : '-'
+
+  const endLabel = endAddr
+    ? endAddr
+    : end
+      ? `${end.lat.toFixed(5)}, ${end.lng.toFixed(5)}`
+      : '-'
+
   const canFindRoute = !!start && !!end
 
   const activeStep = steps?.[stepIdx]
