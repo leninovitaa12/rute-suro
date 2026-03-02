@@ -159,3 +159,43 @@ html {
   outline: 2px solid #8b1a1a;
   outline-offset: 2px;
 }
+
+/* ===== MAP CLOSURE LABEL UX (DITAMBAHKAN, TIDAK MENGUBAH CSS KAMU) ===== */
+.leaflet-tooltip.closure-pill-tooltip {
+  background: rgba(255, 255, 255, 0.18) !important; /* ✅ sangat transparan */
+  border: 1px solid rgba(239, 68, 68, 0.22) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.10) !important;
+
+  color: rgba(127, 29, 29, 0.92) !important;
+  font-weight: 800 !important;
+  font-size: 11px !important;
+
+  border-radius: 999px !important;
+  padding: 3px 8px !important;
+
+  max-width: 240px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+
+  backdrop-filter: blur(3px) !important; /* blur tipis biar tetap kebaca */
+  pointer-events: none !important;       /* gak ganggu klik map */
+}
+
+.leaflet-tooltip.closure-pill-tooltip::before {
+  display: none !important;
+}
+
+/* Default: label disembunyikan (munculkan via hover / tap dengan class) */
+.leaflet-tooltip.closure-pill-tooltip.closure-hidden {
+  opacity: 0 !important;
+  transform: translateY(2px) scale(0.98) !important;
+  transition: opacity 140ms ease, transform 140ms ease !important;
+}
+
+/* Saat aktif (hover desktop / tap mobile): tampil */
+.leaflet-tooltip.closure-pill-tooltip.closure-show {
+  opacity: 1 !important;
+  transform: translateY(0) scale(1) !important;
+  transition: opacity 140ms ease, transform 140ms ease !important;
+}

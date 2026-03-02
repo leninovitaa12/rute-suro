@@ -12,6 +12,7 @@ import {
 import L from 'leaflet'
 import dayjs from 'dayjs'
 import { api } from '../../lib/api.js'
+import RightDockPanel from '../../components/RightDockPanel.jsx'
 
 const DEFAULT_CENTER = [-7.871, 111.462]
 const OFF_ROUTE_TOLERANCE_M = 35
@@ -24,10 +25,10 @@ const STREET_FETCH_MIN_MS = 3000 // throttle "kamu sedang di jalan apa"
 
 // smooth follow
 const FOLLOW_ZOOM = 18
-const FOLLOW_FLY_DURATION = 0.65 
+const FOLLOW_FLY_DURATION = 0.65
 
 // reverse geocoding (OSM/Nominatim)
-const REVERSE_GEO_TTL_MS = 24 * 60 * 60 * 1000 
+const REVERSE_GEO_TTL_MS = 24 * 60 * 60 * 1000
 const REVERSE_GEO_TIMEOUT_MS = 9000
 
 delete L.Icon.Default.prototype._getIconUrl
@@ -83,7 +84,7 @@ function distanceToPolylineM(point, polyline) {
   return best
 }
 
-// ===== helper: haversine distance (untuk jarak ke step) =====
+// ===== helper: haversine distance =====
 function haversineM(a, b) {
   if (!a || !b) return Infinity
   const R = 6371000
@@ -125,18 +126,32 @@ function fmtKm(m) {
   const km = Number(m) / 1000
   return km < 10 ? `${km.toFixed(2)} km` : `${km.toFixed(1)} km`
 }
+function fmtMinShort(sec) {
+  if (sec == null || !Number.isFinite(Number(sec))) return '?'
+  const mins = Number(sec) / 60
+  if (mins < 1) return '<1'
+  if (mins < 10) return mins.toFixed(1)
+  return mins.toFixed(0)
+}
+function fmtDistShort(m) {
+  if (m == null || !Number.isFinite(Number(m))) return '?'
+  const mm = Number(m)
+  if (mm < 1000) return `${Math.max(1, Math.round(mm))} m`
+  const km = mm / 1000
+  return km < 10 ? `${km.toFixed(2)} km` : `${km.toFixed(1)} km`
+}
 
 // ===== UI small components =====
 function MapBadge({ tracking, followMe, voiceOn }) {
   return (
     <div className="absolute top-3 left-3 z-[1000] pointer-events-none">
-      <div className="bg-white/95 backdrop-blur border border-gray-200 shadow-sm rounded-xl px-3 py-2">
+      <div className="bg-white/70 backdrop-blur border border-gray-200 shadow-sm rounded-xl px-3 py-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span
             className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
               tracking
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                : 'bg-gray-50 text-gray-700 border-gray-200'
+                ? 'bg-emerald-50/80 text-emerald-800 border-emerald-200'
+                : 'bg-gray-50/80 text-gray-700 border-gray-200'
             }`}
           >
             {tracking ? 'NAVIGASI AKTIF' : 'NAVIGASI OFF'}
@@ -145,8 +160,8 @@ function MapBadge({ tracking, followMe, voiceOn }) {
           <span
             className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
               followMe
-                ? 'bg-gray-900 text-white border-gray-900'
-                : 'bg-white text-gray-700 border-gray-200'
+                ? 'bg-gray-900/90 text-white border-gray-900'
+                : 'bg-white/70 text-gray-700 border-gray-200'
             }`}
           >
             Ikuti: {followMe ? 'ON' : 'OFF'}
@@ -155,8 +170,8 @@ function MapBadge({ tracking, followMe, voiceOn }) {
           <span
             className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
               voiceOn
-                ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
-                : 'bg-white text-gray-700 border-gray-200'
+                ? 'bg-indigo-50/80 text-indigo-800 border-indigo-200'
+                : 'bg-white/70 text-gray-700 border-gray-200'
             }`}
           >
             Suara: {voiceOn ? 'ON' : 'OFF'}
@@ -171,14 +186,89 @@ function InstructionOverlay({ tracking, activeStep, distToNext }) {
   if (!tracking || !activeStep) return null
   return (
     <div className="absolute top-3 right-3 left-3 sm:left-auto z-[1000] pointer-events-none">
-      <div className="bg-emerald-50/95 backdrop-blur border border-emerald-200 shadow-sm rounded-xl px-3 py-2">
+      <div className="bg-emerald-50/75 backdrop-blur border border-emerald-200 shadow-sm rounded-xl px-3 py-2">
         <p className="text-[11px] font-semibold text-emerald-900 mb-0.5">Instruksi</p>
         <p className="text-sm font-bold text-emerald-900 leading-snug">{activeStep.instruction}</p>
         {distToNext != null ? (
           <p className="mt-1 text-[11px] text-emerald-900/80">
-            Jarak ke instruksi berikutnya: <b>{distToNext} m</b>
+            <b>{distToNext} m</b>
           </p>
         ) : null}
+      </div>
+    </div>
+  )
+}
+
+// ✅ Ringkasan bawah (smooth, tanpa teks tambahan; saat tracking => sisa)
+function RouteSummaryBar({ activeRoute, selectedMode, tracking, myPos, end, onRecenter }) {
+  if (!activeRoute) return null
+
+  const totalSec = Number(activeRoute?.total_time_sec)
+  const totalLen = Number(activeRoute?.total_length_m)
+
+  let targetSec = totalSec
+  let targetM = totalLen
+
+  if (
+    tracking &&
+    myPos &&
+    end &&
+    Number.isFinite(totalSec) &&
+    Number.isFinite(totalLen) &&
+    totalSec > 0 &&
+    totalLen > 0
+  ) {
+    const remainM = haversineM(myPos, end) // estimasi cepat
+    const avgSpeedMps = totalLen / totalSec
+    const estRemainSec = Math.max(0, remainM / Math.max(avgSpeedMps, 0.15))
+    targetSec = estRemainSec
+    targetM = remainM
+  }
+
+  const [dispSec, setDispSec] = React.useState(() => (Number.isFinite(targetSec) ? targetSec : 0))
+  const [dispM, setDispM] = React.useState(() => (Number.isFinite(targetM) ? targetM : 0))
+
+  React.useEffect(() => {
+    let raf = 0
+    let alive = true
+    const lerp = (a, b, t) => a + (b - a) * t
+
+    const tick = () => {
+      if (!alive) return
+      setDispSec((prev) => lerp(Number.isFinite(prev) ? prev : 0, Number.isFinite(targetSec) ? targetSec : 0, 0.18))
+      setDispM((prev) => lerp(Number.isFinite(prev) ? prev : 0, Number.isFinite(targetM) ? targetM : 0, 0.18))
+      raf = requestAnimationFrame(tick)
+    }
+
+    raf = requestAnimationFrame(tick)
+    return () => {
+      alive = false
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [targetSec, targetM])
+
+  const modeLabel = selectedMode === 'fastest' ? 'Tercepat' : 'Terpendek'
+
+  return (
+    <div className="absolute bottom-3 left-3 right-3 z-[1000] pointer-events-none">
+      <div className="route-summary-shell">
+        <div className="route-summary-main">
+          <div className="route-summary-time">
+            {fmtMinShort(dispSec)}
+            <span className="route-summary-unit"> min</span>
+          </div>
+
+          <div className="route-summary-meta">
+            <span className="route-summary-dist">{fmtDistShort(dispM)}</span>
+            <span className={`route-summary-chip ${selectedMode === 'fastest' ? 'chip-fast' : 'chip-short'}`}>
+              {modeLabel}
+            </span>
+          </div>
+        </div>
+
+        <button type="button" onClick={onRecenter} className="route-summary-btn" aria-label="Recenter">
+          ⌖
+        </button>
       </div>
     </div>
   )
@@ -189,7 +279,6 @@ function LaneSim({ step }) {
   if (!step) return null
   const t = (step.type || '').toLowerCase()
 
-  // lanes: [left, straight, right] with one highlighted
   let active = 'straight'
   if (t.includes('left')) active = 'left'
   else if (t.includes('right')) active = 'right'
@@ -293,13 +382,13 @@ export default function UserMapPage() {
   const [end, setEnd] = React.useState(null)
   const [pickMode, setPickMode] = React.useState('start')
 
-  // (reverse geocoding labels)
+  // reverse geocoding labels
   const [startAddr, setStartAddr] = React.useState('')
   const [endAddr, setEndAddr] = React.useState('')
 
   // two routes
   const [routes, setRoutes] = React.useState({ fastest: null, shortest: null })
-  const [selectedMode, setSelectedMode] = React.useState('fastest') // default tetap seperti sistem lama: fastest
+  const [selectedMode, setSelectedMode] = React.useState('fastest')
   const activeRoute = routes?.[selectedMode] || null
 
   // turn-by-turn state
@@ -307,7 +396,7 @@ export default function UserMapPage() {
   const [stepIdx, setStepIdx] = React.useState(0)
   const [currentStreet, setCurrentStreet] = React.useState('')
 
-  // loading granular
+  // loading
   const [loadingBootstrap, setLoadingBootstrap] = React.useState(true)
   const [loadingEvents, setLoadingEvents] = React.useState(true)
   const [loadingClosures, setLoadingClosures] = React.useState(true)
@@ -329,25 +418,27 @@ export default function UserMapPage() {
   const mapRef = React.useRef(null)
   const watchIdRef = React.useRef(null)
 
+  // ✅ PANEL KANAN
+  const [rightPanelOpen, setRightPanelOpen] = React.useState(true)
+
   // cache closures ringan
-  const closuresCacheRef = React.useRef({
-    data: null,
-    fetchedAt: 0
-  })
+  const closuresCacheRef = React.useRef({ data: null, fetchedAt: 0 })
 
   // throttle street fetch
   const lastStreetFetchRef = React.useRef(0)
 
-  // reverse geocode cache + abort (biar hemat request & tidak tabrakan)
-  const reverseCacheRef = React.useRef(new Map()) // key -> { label, ts }
+  // reverse geocode cache + abort
+  const reverseCacheRef = React.useRef(new Map())
   const reverseAbortRef = React.useRef({ start: null, end: null })
 
-  const desktopH = `calc(100vh - ${NAVBAR_H_PX}px)`
   const isMobile = typeof window !== 'undefined' ? window.innerWidth < 1024 : false
 
-  // Reverse Geocoding (OSM)
+  React.useEffect(() => {
+    if (isMobile) setRightPanelOpen(true)
+  }, [isMobile])
+
+  // Reverse Geocoding
   function roundKey(lat, lng) {
-    // 5 desimal ~ 1 meter-an (cukup untuk cache)
     return `${lat.toFixed(5)},${lng.toFixed(5)}`
   }
 
@@ -363,16 +454,10 @@ export default function UserMapPage() {
       `&lon=${encodeURIComponent(lng)}` +
       `&zoom=18&addressdetails=1`
 
-    // Nominatim menyarankan identitas aplikasi. Di browser kita tidak bisa set User-Agent,
-    // jadi pakai parameter email opsional kalau mau. (Tidak wajib.)
-    // contoh tambah: + `&email=youremail@example.com`
-
     const res = await fetchWithTimeout(url, {
       timeoutMs: REVERSE_GEO_TIMEOUT_MS,
       signal,
-      headers: {
-        Accept: 'application/json'
-      }
+      headers: { Accept: 'application/json' }
     })
 
     if (!res.ok) throw new Error('reverse geocode failed')
@@ -386,16 +471,12 @@ export default function UserMapPage() {
     if (!latlng) return
     const { lat, lng } = latlng
 
-    // batalkan request lama utk mode yang sama
     try {
       if (reverseAbortRef.current[mode]) reverseAbortRef.current[mode].abort()
-    } catch {
-      // ignore
-    }
+    } catch {}
     const ctrl = new AbortController()
     reverseAbortRef.current[mode] = ctrl
 
-    // optimistik: tampilkan koordinat dulu agar UI tidak kosong
     const fallback = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
     if (mode === 'start') setStartAddr(fallback)
     else setEndAddr(fallback)
@@ -403,19 +484,16 @@ export default function UserMapPage() {
     try {
       const label = await reverseGeocodeOSM(lat, lng, { signal: ctrl.signal })
       if (ctrl.signal.aborted) return
-
-      // set label kalau ada, kalau kosong fallback
       if (mode === 'start') setStartAddr(label || fallback)
       else setEndAddr(label || fallback)
-    } catch (e) {
+    } catch {
       if (ctrl.signal?.aborted) return
-      // fallback tetap koordinat (tidak merusak fitur)
       if (mode === 'start') setStartAddr(fallback)
       else setEndAddr(fallback)
     }
   }
 
-  // BOOTSTRAP: 1x fetch
+  // BOOTSTRAP
   React.useEffect(() => {
     let alive = true
 
@@ -435,11 +513,7 @@ export default function UserMapPage() {
 
         setEvents(ev)
         setClosures(cl)
-
-        closuresCacheRef.current = {
-          data: cl,
-          fetchedAt: Date.now()
-        }
+        closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
       } catch (e) {
         if (!alive) return
         setMsg('Gagal memuat data peta: ' + (e?.response?.data?.error || e.message))
@@ -451,21 +525,17 @@ export default function UserMapPage() {
       }
     })()
 
-    return () => {
-      alive = false
-    }
+    return () => { alive = false }
   }, [])
 
   function onPick(latlng, mode) {
     if (mode === 'start') {
       setStart(latlng)
       setMsg('START tersimpan. Sekarang pilih TUJUAN.')
-      // reverse geocoding start
       fillAddressFor('start', latlng)
     } else {
       setEnd(latlng)
       setMsg('TUJUAN tersimpan. Tekan "Cari Rute".')
-      // reverse geocoding end
       fillAddressFor('end', latlng)
     }
   }
@@ -476,11 +546,9 @@ export default function UserMapPage() {
     const pt = { lat: ev.lat, lng: ev.lng }
     setEnd(pt)
     setMsg(`Tujuan di-set ke event: ${ev.name}. Tekan "Cari Rute".`)
-    // reverse geocoding end
     fillAddressFor('end', pt)
   }
 
-  // Closures Refresh + Cache
   async function refreshClosures({ force = false, silent = true } = {}) {
     const cache = closuresCacheRef.current
     const stillValid = cache.data && Date.now() - cache.fetchedAt < CLOSURES_TTL_MS
@@ -497,7 +565,6 @@ export default function UserMapPage() {
       const res = await api.get('/map_bootstrap')
       const data = res.data || {}
       const cl = Array.isArray(data.closures_active) ? data.closures_active : []
-
       setClosures(cl)
       closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
     } catch (e) {
@@ -507,7 +574,6 @@ export default function UserMapPage() {
     }
   }
 
-  // ROUTING (2 alternatif)
   async function findRoute(customStart, customEnd, { silent = false } = {}) {
     const s = customStart || start
     const e = customEnd || end
@@ -519,23 +585,19 @@ export default function UserMapPage() {
     setLoadingRoute(true)
     if (!silent) setMsg('Menghitung rute A* (tercepat & terpendek)...')
 
-    // reset
     setRoutes({ fastest: null, shortest: null })
     setSteps([])
     setStepIdx(0)
 
     try {
-      // backend mendukung mode:"both"
       const res = await api.post('/route', { start: s, end: e, mode: 'both' })
       const data = res.data || {}
 
       const fastest = data.fastest || null
       const shortest = data.shortest || null
 
-      // simpan rute
       setRoutes({ fastest, shortest })
 
-      // pilih default: fastest (agar tidak mengubah sistem lama)
       const nextMode = selectedMode || 'fastest'
       const chosen = (nextMode === 'shortest' ? shortest : fastest) || fastest || shortest
       if (chosen) {
@@ -548,7 +610,6 @@ export default function UserMapPage() {
         setMsg(`Rute ditemukan. Estimasi ${mins} menit. Pilih alternatif rute.`)
       }
 
-      // requirement: closures refresh setiap selesai cari rute
       await refreshClosures({ force: true, silent: true })
     } catch (e2) {
       if (!silent) setMsg('Gagal: ' + (e2?.response?.data?.error || e2.message))
@@ -557,7 +618,6 @@ export default function UserMapPage() {
     }
   }
 
-  // reroute khusus mode yang sedang dipilih (lebih cepat dibanding hitung both)
   async function rerouteSelected(customStart, customEnd) {
     const s = customStart || start
     const e = customEnd || end
@@ -573,7 +633,6 @@ export default function UserMapPage() {
 
       await refreshClosures({ force: true, silent: true })
     } catch (err) {
-      // silent
       console.warn('rerouteSelected failed:', err)
     }
   }
@@ -590,8 +649,6 @@ export default function UserMapPage() {
         setPickMode('end')
         setMsg('Lokasi kamu dipakai sebagai START. Sekarang pilih TUJUAN.')
         if (followMe && mapRef.current) mapRef.current.setView([pt.lat, pt.lng], 16)
-
-        // reverse geocoding start
         fillAddressFor('start', pt)
       },
       (err) => setGeoErr(err.message || 'Gagal mengambil lokasi'),
@@ -611,7 +668,6 @@ export default function UserMapPage() {
         const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude }
         setMyPos(pt)
 
-        // bearing: prefer device heading if available
         if (Number.isFinite(pos.coords.heading) && pos.coords.heading != null) {
           setBearing((pos.coords.heading + 360) % 360)
         } else {
@@ -620,7 +676,6 @@ export default function UserMapPage() {
         }
         lastPosRef.current = pt
 
-        // Smooth camera follow
         if (followMe && mapRef.current) {
           const z = tracking ? Math.max(mapRef.current.getZoom(), FOLLOW_ZOOM) : mapRef.current.getZoom()
           mapRef.current.flyTo([pt.lat, pt.lng], z, { animate: true, duration: FOLLOW_FLY_DURATION })
@@ -645,7 +700,6 @@ export default function UserMapPage() {
 
   React.useEffect(() => () => stopTracking(), [])
 
-  // Saat user pilih mode (dan tidak tracking), update steps ke mode itu
   React.useEffect(() => {
     if (tracking) return
     const r = routes?.[selectedMode]
@@ -655,7 +709,6 @@ export default function UserMapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMode])
 
-  // TURN BY TURN: auto advance step
   React.useEffect(() => {
     if (!tracking) return
     if (!myPos || steps.length < 2) return
@@ -670,7 +723,6 @@ export default function UserMapPage() {
     }
   }, [tracking, myPos?.lat, myPos?.lng, steps, stepIdx])
 
-  // VOICE NAV: speak when step changes (throttled)
   React.useEffect(() => {
     if (!tracking) return
     if (!voiceOn) return
@@ -685,7 +737,6 @@ export default function UserMapPage() {
     speak(st.instruction, { rate: 1.02, pitch: 1.0, lang: 'id-ID' })
   }, [tracking, voiceOn, stepIdx, steps])
 
-  // TURN BY TURN: current street (optional)
   React.useEffect(() => {
     if (!tracking) return
     if (!myPos) return
@@ -697,12 +748,10 @@ export default function UserMapPage() {
       try {
         const res = await api.get(`/nearest_street?lat=${myPos.lat}&lng=${myPos.lng}`)
         setCurrentStreet(res?.data?.street_name || '')
-      } catch {
-      }
+      } catch {}
     })()
   }, [tracking, myPos?.lat, myPos?.lng])
 
-  // off-route -> reroute otomatis (tetap)
   React.useEffect(() => {
     if (!tracking) return
     if (!myPos || !end || !activeRoute?.polyline) return
@@ -713,446 +762,484 @@ export default function UserMapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking, myPos?.lat, myPos?.lng, selectedMode])
 
-  // requirement: closures refresh tiap 30 detik saat navigasi aktif
   React.useEffect(() => {
     if (!tracking) return
-
     const id = setInterval(() => {
       refreshClosures({ force: true, silent: true })
     }, 30_000)
-
     return () => clearInterval(id)
   }, [tracking])
 
-  // LABEL: tampilkan alamat (fallback: koordinat)
-  const startLabel = startAddr
-    ? startAddr
-    : start
-      ? `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}`
-      : '-'
-
-  const endLabel = endAddr
-    ? endAddr
-    : end
-      ? `${end.lat.toFixed(5)}, ${end.lng.toFixed(5)}`
-      : '-'
-
+  const startLabel = startAddr ? startAddr : start ? `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}` : '-'
+  const endLabel = endAddr ? endAddr : end ? `${end.lat.toFixed(5)}, ${end.lng.toFixed(5)}` : '-'
   const canFindRoute = !!start && !!end
 
   const activeStep = steps?.[stepIdx]
   const nextStep = steps?.[stepIdx + 1]
-  const distToNext =
-    myPos && nextStep?.location ? Math.round(haversineM(myPos, nextStep.location)) : null
-
-  // responsive heights: saat tracking di HP, map lebih besar
-  const panelMobileH = tracking ? '35vh' : '45vh'
-  const mapMobileH = tracking ? '65vh' : '55vh'
+  const distToNext = myPos && nextStep?.location ? Math.round(haversineM(myPos, nextStep.location)) : null
 
   const fastest = routes.fastest
   const shortest = routes.shortest
   const hasRoutes = !!fastest || !!shortest
 
-  const lockPickRoute = tracking // lock pilihan rute saat navigasi
+  const lockPickRoute = tracking
+
+  const handleRecenter = () => {
+    if (!mapRef.current) return
+    if (myPos) {
+      mapRef.current.flyTo([myPos.lat, myPos.lng], Math.max(mapRef.current.getZoom(), FOLLOW_ZOOM), {
+        animate: true,
+        duration: 0.6
+      })
+    } else if (start) {
+      mapRef.current.flyTo([start.lat, start.lng], 16, { animate: true, duration: 0.6 })
+    } else {
+      mapRef.current.flyTo(DEFAULT_CENTER, 13, { animate: true, duration: 0.6 })
+    }
+  }
 
   return (
     <div className="bg-gray-50">
-      <div className="flex flex-col lg:flex-row w-full">
-        {/* PANEL */}
-        <div
-          className="bg-white lg:shadow-lg w-full lg:w-[420px] border-b lg:border-b-0 lg:border-r border-gray-200"
-          style={{ maxHeight: isMobile ? panelMobileH : undefined }}
+      <div className="relative w-full" style={{ height: `calc(100vh - ${NAVBAR_H_PX}px)` }}>
+        <MapBadge tracking={tracking} followMe={followMe} voiceOn={voiceOn} />
+        <InstructionOverlay tracking={tracking} activeStep={activeStep} distToNext={distToNext} />
+
+        {/* ✅ Smooth Summary */}
+        <RouteSummaryBar
+          activeRoute={activeRoute}
+          selectedMode={selectedMode}
+          tracking={tracking}
+          myPos={myPos}
+          end={end}
+          onRecenter={handleRecenter}
+        />
+
+        <RightDockPanel
+          open={rightPanelOpen}
+          onToggle={() => setRightPanelOpen((v) => !v)}
+          title="RUTE SURO"
         >
-          <div
-            className="p-4 md:p-6 overflow-y-auto lg:h-full"
-            style={{ height: isMobile ? panelMobileH : desktopH }}
-          >
-            <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Route Finder</h3>
-
-            {/* Loading banner untuk bootstrap */}
-            {loadingBootstrap ? (
-              <div className="mb-4 text-sm text-gray-700">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="font-semibold text-blue-900 mb-1">Memuat data peta…</p>
-                  <ul className="list-disc ml-5 space-y-1">
-                    <li>{loadingEvents ? 'Memuat event…' : 'Event siap'}</li>
-                    <li>{loadingClosures ? 'Memuat rekayasa jalan…' : 'Rekayasa jalan siap'}</li>
-                  </ul>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="text-sm text-gray-700 mb-4">
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <p className="font-semibold text-gray-900 mb-1">Panduan cepat</p>
-                <ol className="list-decimal ml-5 space-y-1">
-                  <li>Tentukan <b>START</b> dan <b>TUJUAN</b>.</li>
-                  <li>Tekan <b>Cari Rute</b>.</li>
-                  <li>Pilih <b>Tercepat</b> / <b>Terpendek</b>.</li>
-                  <li>Tekan <b>Mulai Navigasi</b>.</li>
-                </ol>
-                <p className="mt-2 text-gray-600">{msg}</p>
+          {/* Loading banner */}
+          {loadingBootstrap ? (
+            <div className="mb-4 text-sm text-gray-700">
+              <div className="bg-blue-50/70 border border-blue-200 rounded-lg p-3">
+                <p className="font-semibold text-blue-900 mb-1">Memuat data peta…</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>{loadingEvents ? 'Memuat event…' : 'Event siap'}</li>
+                  <li>{loadingClosures ? 'Memuat rekayasa jalan…' : 'Rekayasa jalan siap'}</li>
+                </ul>
               </div>
             </div>
+          ) : null}
 
-            {/* TURN BY TURN UI (panel) */}
-            {tracking && (activeStep || currentStreet) ? (
-              <div className="mb-4">
-                {currentStreet ? (
-                  <div className="text-xs text-gray-800 bg-white border border-gray-200 rounded-lg p-2 mb-2">
-                    Kamu sedang di: <b>{currentStreet}</b>
-                  </div>
-                ) : null}
+          <div className="text-sm text-gray-700 mb-4">
+            <div className="bg-gray-50/70 border border-gray-200 rounded-lg p-3">
+              <p className="font-semibold text-gray-900 mb-1">Panduan cepat</p>
+              <ol className="list-decimal ml-5 space-y-1">
+                <li>Tentukan <b>START</b> dan <b>TUJUAN</b>.</li>
+                <li>Tekan <b>Cari Rute</b>.</li>
+                <li>Pilih <b>Tercepat</b> / <b>Terpendek</b>.</li>
+                <li>Tekan <b>Mulai Navigasi</b>.</li>
+              </ol>
+              <p className="mt-2 text-gray-600">{msg}</p>
+            </div>
+          </div>
 
-                {activeStep ? (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                    <p className="text-xs font-semibold text-emerald-900 mb-1">Instruksi</p>
-                    <p className="text-sm font-bold text-emerald-900">{activeStep.instruction}</p>
-                    {distToNext != null ? (
-                      <p className="mt-1 text-xs text-emerald-800">
-                        Jarak ke instruksi berikutnya: <b>{distToNext} m</b>
-                      </p>
-                    ) : null}
-                    <p className="mt-1 text-[11px] text-emerald-900/70">
-                      Step {Math.min(stepIdx + 1, steps.length)} / {steps.length || 0}
+          {/* TURN BY TURN UI */}
+          {tracking && (activeStep || currentStreet) ? (
+            <div className="mb-4">
+              {currentStreet ? (
+                <div className="text-xs text-gray-800 bg-white/70 border border-gray-200 rounded-lg p-2 mb-2">
+                  Kamu sedang di: <b>{currentStreet}</b>
+                </div>
+              ) : null}
+
+              {activeStep ? (
+                <div className="bg-emerald-50/70 border border-emerald-200 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-emerald-900 mb-1">Instruksi</p>
+                  <p className="text-sm font-bold text-emerald-900">{activeStep.instruction}</p>
+                  {distToNext != null ? (
+                    <p className="mt-1 text-xs text-emerald-800">
+                      Jarak ke instruksi berikutnya: <b>{distToNext} m</b>
                     </p>
-
-                    {/* Lane simulation (panel) */}
-                    <LaneSim step={activeStep} />
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            {/* PILIH RUTE (mirip Google Maps) */}
-            {hasRoutes ? (
-              <div className="mb-4">
-                <div className="bg-white border border-gray-200 rounded-lg p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-bold text-gray-900">Alternatif Rute</p>
-                    {lockPickRoute ? (
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-700">
-                        terkunci saat navigasi
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-2 grid grid-cols-1 gap-2">
-                    {/* FASTEST */}
-                    <button
-                      type="button"
-                      disabled={!fastest || lockPickRoute}
-                      onClick={() => {
-                        setSelectedMode('fastest')
-                        if (fastest) {
-                          setSteps(Array.isArray(fastest.steps) ? fastest.steps : [])
-                          setStepIdx(0)
-                        }
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg border transition ${
-                        selectedMode === 'fastest'
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'bg-white text-gray-900 border-gray-200 hover:bg-gray-50'
-                      } ${(!fastest || lockPickRoute) ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="font-semibold">Rute Tercepat</div>
-                        <div className="text-xs font-semibold">{fmtMin(fastest?.total_time_sec)}</div>
-                      </div>
-                      <div className="text-xs opacity-80">{fmtKm(fastest?.total_length_m)}</div>
-                      <div className="mt-1 text-[11px] opacity-80">
-                        {selectedMode === 'fastest' ? 'Dipilih' : 'Klik untuk memilih'}
-                      </div>
-                    </button>
-
-                    {/* SHORTEST */}
-                    <button
-                      type="button"
-                      disabled={!shortest || lockPickRoute}
-                      onClick={() => {
-                        setSelectedMode('shortest')
-                        if (shortest) {
-                          setSteps(Array.isArray(shortest.steps) ? shortest.steps : [])
-                          setStepIdx(0)
-                        }
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg border transition ${
-                        selectedMode === 'shortest'
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'bg-white text-gray-900 border-gray-200 hover:bg-gray-50'
-                      } ${(!shortest || lockPickRoute) ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="font-semibold">Rute Terpendek</div>
-                        <div className="text-xs font-semibold">{fmtMin(shortest?.total_time_sec)}</div>
-                      </div>
-                      <div className="text-xs opacity-80">{fmtKm(shortest?.total_length_m)}</div>
-                      <div className="mt-1 text-[11px] opacity-80">
-                        {selectedMode === 'shortest' ? 'Dipilih' : 'Klik untuk memilih'}
-                      </div>
-                    </button>
-                  </div>
-
-                  <p className="mt-2 text-[11px] text-gray-600">
-                    Rute terpilih akan dipakai untuk navigasi dan reroute otomatis.
+                  ) : null}
+                  <p className="mt-1 text-[11px] text-emerald-900/70">
+                    Step {Math.min(stepIdx + 1, steps.length)} / {steps.length || 0}
                   </p>
+                  <LaneSim step={activeStep} />
                 </div>
-              </div>
-            ) : null}
-
-            <hr className="my-3 border-gray-200" />
-
-            <div className="mb-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Pilih Event (Opsional)</label>
-              <select
-                value={selectedEventId}
-                onChange={(e) => setSelectedEventId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-red-800"
-              >
-                <option value="">-- pilih event --</option>
-                {events.map((ev) => (
-                  <option key={ev.id} value={ev.id}>
-                    {ev.name}{ev.start_time ? ` (${dayjs(ev.start_time).format('DD/MM HH:mm')})` : ''}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                onClick={applyEventAsDestination}
-                className="w-full mt-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-800 font-semibold rounded-lg text-sm border border-red-100 transition"
-              >
-                Jadikan Event sebagai Tujuan
-              </button>
-            </div>
-
-            <hr className="my-3 border-gray-200" />
-
-            <div className="mb-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Pilih Titik di Peta</label>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setPickMode('start'); setMsg('Mode: pilih START. Klik peta.'); }}
-                  className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm border transition ${
-                    pickMode === 'start'
-                      ? 'bg-[#8b1a1a] text-white border-[#8b1a1a]'
-                      : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  Pilih START
-                </button>
-
-                <button
-                  onClick={() => { setPickMode('end'); setMsg('Mode: pilih TUJUAN. Klik peta.'); }}
-                  className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm border transition ${
-                    pickMode === 'end'
-                      ? 'bg-[#8b1a1a] text-white border-[#8b1a1a]'
-                      : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  Pilih TUJUAN
-                </button>
-              </div>
-
-              <button
-                onClick={useMyLocationAsStart}
-                className="w-full mt-2 px-3 py-2 rounded-lg font-semibold text-sm border border-gray-300 bg-white hover:bg-gray-50 transition"
-              >
-                Pakai Lokasi Saya sebagai START
-              </button>
-
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={() => (tracking ? stopTracking() : startTracking())}
-                  disabled={!activeRoute && !tracking} // butuh rute terpilih untuk mulai navigasi
-                  className={`flex-1 px-3 py-2 rounded-lg font-bold text-sm transition ${
-                    (!activeRoute && !tracking)
-                      ? 'bg-gray-400 cursor-not-allowed text-white'
-                      : tracking
-                        ? 'bg-gray-900 hover:bg-gray-950 text-white'
-                        : 'bg-[#8b1a1a] hover:bg-[#6b1414] text-white'
-                  }`}
-                >
-                  {tracking ? 'Stop Navigasi' : 'Mulai Navigasi'}
-                </button>
-
-                <button
-                  onClick={() => setFollowMe((v) => !v)}
-                  className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm border transition ${
-                    followMe
-                      ? 'bg-gray-900 text-white border-gray-900 hover:bg-gray-950'
-                      : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  Ikuti Saya: {followMe ? 'ON' : 'OFF'}
-                </button>
-              </div>
-
-              {/* Voice toggle */}
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={() => setVoiceOn((v) => !v)}
-                  className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm border transition ${
-                    voiceOn
-                      ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
-                      : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  Suara: {voiceOn ? 'ON' : 'OFF'}
-                </button>
-
-                <button
-                  onClick={() => {
-                    if (tracking && activeStep?.instruction) speak(activeStep.instruction, { lang: 'id-ID' })
-                  }}
-                  disabled={!tracking || !activeStep?.instruction || !voiceOn}
-                  className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm border transition ${
-                    (!tracking || !activeStep?.instruction || !voiceOn)
-                      ? 'bg-gray-200 text-gray-500 border-gray-200 cursor-not-allowed'
-                      : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  Ulangi Instruksi
-                </button>
-              </div>
-
-              {geoErr ? (
-                <p className="text-xs text-red-700 bg-red-50 border border-red-200 p-2 rounded mt-2">{geoErr}</p>
               ) : null}
             </div>
+          ) : null}
 
-            <div className="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
-              <p className="text-xs font-semibold text-gray-600 uppercase">START</p>
-              <p className="text-xs text-gray-900 font-mono break-all mb-3">{startLabel}</p>
-              <p className="text-xs font-semibold text-gray-600 uppercase">TUJUAN</p>
-              <p className="text-xs text-gray-900 font-mono break-all">{endLabel}</p>
+          {/* PILIH RUTE */}
+          {hasRoutes ? (
+            <div className="mb-4">
+              <div className="bg-white/70 border border-gray-200 rounded-lg p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-gray-900">Alternatif Rute</p>
+                  {lockPickRoute ? (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-700">
+                      terkunci saat navigasi
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="mt-2 grid grid-cols-1 gap-2">
+                  <button
+                    type="button"
+                    disabled={!fastest || lockPickRoute}
+                    onClick={() => {
+                      setSelectedMode('fastest')
+                      if (fastest) {
+                        setSteps(Array.isArray(fastest.steps) ? fastest.steps : [])
+                        setStepIdx(0)
+                      }
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-lg border transition ${
+                      selectedMode === 'fastest'
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-900 border-gray-200 hover:bg-gray-50'
+                    } ${(!fastest || lockPickRoute) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold">Rute Tercepat</div>
+                      <div className="text-xs font-semibold">{fmtMin(fastest?.total_time_sec)}</div>
+                    </div>
+                    <div className="text-xs opacity-80">{fmtKm(fastest?.total_length_m)}</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!shortest || lockPickRoute}
+                    onClick={() => {
+                      setSelectedMode('shortest')
+                      if (shortest) {
+                        setSteps(Array.isArray(shortest.steps) ? shortest.steps : [])
+                        setStepIdx(0)
+                      }
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-lg border transition ${
+                      selectedMode === 'shortest'
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-900 border-gray-200 hover:bg-gray-50'
+                    } ${(!shortest || lockPickRoute) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold">Rute Terpendek</div>
+                      <div className="text-xs font-semibold">{fmtMin(shortest?.total_time_sec)}</div>
+                    </div>
+                    <div className="text-xs opacity-80">{fmtKm(shortest?.total_length_m)}</div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <hr className="my-3 border-gray-200" />
+
+          {/* Event */}
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Pilih Event (Opsional)</label>
+            <select
+              value={selectedEventId}
+              onChange={(e) => setSelectedEventId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-red-800"
+            >
+              <option value="">-- pilih event --</option>
+              {events.map((ev) => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.name}{ev.start_time ? ` (${dayjs(ev.start_time).format('DD/MM HH:mm')})` : ''}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={applyEventAsDestination}
+              className="w-full mt-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-800 font-semibold rounded-lg text-sm border border-red-100 transition"
+            >
+              Jadikan Event sebagai Tujuan
+            </button>
+          </div>
+
+          <hr className="my-3 border-gray-200" />
+
+          {/* Pick */}
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Pilih Titik di Peta</label>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setPickMode('start'); setMsg('Mode: pilih START. Klik peta.'); }}
+                className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm border transition ${
+                  pickMode === 'start'
+                    ? 'bg-[#8b1a1a] text-white border-[#8b1a1a]'
+                    : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Pilih START
+              </button>
+
+              <button
+                onClick={() => { setPickMode('end'); setMsg('Mode: pilih TUJUAN. Klik peta.'); }}
+                className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm border transition ${
+                  pickMode === 'end'
+                    ? 'bg-[#8b1a1a] text-white border-[#8b1a1a]'
+                    : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Pilih TUJUAN
+              </button>
             </div>
 
             <button
-              onClick={() => findRoute()}
-              disabled={loadingRoute || !canFindRoute}
-              className={`w-full px-3 py-3 font-bold text-white text-sm rounded-lg transition ${
-                loadingRoute || !canFindRoute ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#8b1a1a] hover:bg-[#6b1414]'
-              }`}
+              onClick={useMyLocationAsStart}
+              className="w-full mt-2 px-3 py-2 rounded-lg font-semibold text-sm border border-gray-300 bg-white hover:bg-gray-50 transition"
             >
-              {loadingRoute ? 'Menghitung Rute...' : 'Cari Rute (A*)'}
+              Pakai Lokasi Saya sebagai START
             </button>
 
-            <div className="mt-4 text-xs text-gray-700 bg-orange-50 p-3 rounded-lg border border-orange-200">
-              <p className="font-semibold text-orange-900 mb-2">Informasi Peta</p>
-              <p className="flex items-center gap-2">
-                <span className="inline-block w-3 h-3 bg-red-500 rounded" />
-                <span>Jalan ditutup (rekayasa)</span>
-              </p>
-              {loadingClosures ? (
-                <p className="mt-2 text-[11px] text-orange-900/80">Memuat rekayasa jalan...</p>
-              ) : null}
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => (tracking ? stopTracking() : startTracking())}
+                disabled={!activeRoute && !tracking}
+                className={`flex-1 px-3 py-2 rounded-lg font-bold text-sm transition ${
+                  (!activeRoute && !tracking)
+                    ? 'bg-gray-400 cursor-not-allowed text-white'
+                    : tracking
+                      ? 'bg-gray-900 hover:bg-gray-950 text-white'
+                      : 'bg-[#8b1a1a] hover:bg-[#6b1414] text-white'
+                }`}
+              >
+                {tracking ? 'Stop Navigasi' : 'Mulai Navigasi'}
+              </button>
+
+              <button
+                onClick={() => setFollowMe((v) => !v)}
+                className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm border transition ${
+                  followMe
+                    ? 'bg-gray-900 text-white border-gray-900 hover:bg-gray-950'
+                    : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Ikuti Saya: {followMe ? 'ON' : 'OFF'}
+              </button>
             </div>
+
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => setVoiceOn((v) => !v)}
+                className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm border transition ${
+                  voiceOn
+                    ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                    : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Suara: {voiceOn ? 'ON' : 'OFF'}
+              </button>
+
+              <button
+                onClick={() => {
+                  if (tracking && activeStep?.instruction) speak(activeStep.instruction, { lang: 'id-ID' })
+                }}
+                disabled={!tracking || !activeStep?.instruction || !voiceOn}
+                className={`flex-1 px-3 py-2 rounded-lg font-semibold text-sm border transition ${
+                  (!tracking || !activeStep?.instruction || !voiceOn)
+                    ? 'bg-gray-200 text-gray-500 border-gray-200 cursor-not-allowed'
+                    : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Ulangi Instruksi
+              </button>
+            </div>
+
+            {geoErr ? (
+              <p className="text-xs text-red-700 bg-red-50 border border-red-200 p-2 rounded mt-2">{geoErr}</p>
+            ) : null}
           </div>
-        </div>
 
-        {/* MAP */}
-        <div className="relative w-full flex-1 bg-white lg:shadow-lg">
-          <div className="relative" style={{ height: isMobile ? mapMobileH : 'calc(100vh - 80px)' }}>
-            <MapBadge tracking={tracking} followMe={followMe} voiceOn={voiceOn} />
-            <InstructionOverlay tracking={tracking} activeStep={activeStep} distToNext={distToNext} />
+          <div className="mb-4 bg-gray-50/70 p-3 rounded-lg border border-gray-200">
+            <p className="text-xs font-semibold text-gray-600 uppercase">START</p>
+            <p className="text-xs text-gray-900 font-mono break-all mb-3">{startLabel}</p>
+            <p className="text-xs font-semibold text-gray-600 uppercase">TUJUAN</p>
+            <p className="text-xs text-gray-900 font-mono break-all">{endLabel}</p>
+          </div>
 
-            <MapContainer
-              center={DEFAULT_CENTER}
-              zoom={13}
-              style={{ height: '100%', width: '100%' }}
-              whenCreated={(map) => { mapRef.current = map }}
+          <button
+            onClick={() => findRoute()}
+            disabled={loadingRoute || !canFindRoute}
+            className={`w-full px-3 py-3 font-bold text-white text-sm rounded-lg transition ${
+              loadingRoute || !canFindRoute ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#8b1a1a] hover:bg-[#6b1414]'
+            }`}
+          >
+            {loadingRoute ? 'Menghitung Rute...' : 'Cari Rute (A*)'}
+          </button>
+
+          <div className="mt-4 text-xs text-gray-700 bg-orange-50/70 p-3 rounded-lg border border-orange-200">
+            <p className="font-semibold text-orange-900 mb-2">Informasi Peta</p>
+            <p className="flex items-center gap-2">
+              <span className="inline-block w-3 h-3 bg-red-500 rounded" />
+              <span>Jalan ditutup (rekayasa)</span>
+            </p>
+            {loadingClosures ? (
+              <p className="mt-2 text-[11px] text-orange-900/80">Memuat rekayasa jalan...</p>
+            ) : null}
+          </div>
+        </RightDockPanel>
+
+        <MapContainer
+          center={DEFAULT_CENTER}
+          zoom={13}
+          style={{ height: '100%', width: '100%' }}
+          whenCreated={(map) => { mapRef.current = map }}
+        >
+          <TileLayer
+            attribution="&copy; OpenStreetMap contributors"
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <ClickSetter mode={pickMode} onPick={onPick} />
+
+          {myPos && (
+            <>
+              <Marker position={[myPos.lat, myPos.lng]} icon={makeArrowIcon(bearing)}>
+                <Popup>
+                  <b>Posisi Saya</b>
+                  <br />
+                  Bearing: {Math.round(bearing)}°
+                </Popup>
+              </Marker>
+
+              <CircleMarker center={[myPos.lat, myPos.lng]} radius={6} pathOptions={{ color: '#2563eb' }}>
+                <Tooltip direction="top" offset={[0, -8]} opacity={0.9}>
+                  Saya
+                </Tooltip>
+              </CircleMarker>
+            </>
+          )}
+
+          {start && <Marker position={[start.lat, start.lng]}><Popup>Start</Popup></Marker>}
+          {end && <Marker position={[end.lat, end.lng]}><Popup>Tujuan</Popup></Marker>}
+
+          {/* ✅ PENUTUPAN JALAN: 1 closure = 1 polyline + label (muncul hover/tap) */}
+          {closures.map((c) => {
+            const edgeList = Array.isArray(c.edges) ? c.edges : []
+            const multi = edgeList
+              .map((e) => (Array.isArray(e.polyline) ? e.polyline : null))
+              .filter((pl) => Array.isArray(pl) && pl.length > 1)
+              .map((pl) => pl.map((p) => [p.lat, p.lng]))
+
+            if (!multi.length) return null
+
+            const reason = c.reason || 'Rekayasa / ditutup'
+
+            return (
+              <Polyline
+                key={`closure_${c.id}`}
+                positions={multi}
+                pathOptions={{ color: 'red', weight: 6 }}
+                eventHandlers={{
+                  mouseover: (e) => {
+                    // Desktop: tampil saat hover
+                    try {
+                      e?.target?.openTooltip?.()
+                      const el = e?.target?.getTooltip?.()?.getElement?.()
+                      if (el) {
+                        el.classList.remove('closure-hidden')
+                        el.classList.add('closure-show')
+                      }
+                    } catch {}
+                  },
+                  mouseout: (e) => {
+                    // Desktop: hilang saat keluar
+                    try {
+                      const el = e?.target?.getTooltip?.()?.getElement?.()
+                      if (el) {
+                        el.classList.remove('closure-show')
+                        el.classList.add('closure-hidden')
+                      }
+                      e?.target?.closeTooltip?.()
+                    } catch {}
+                  },
+                  click: (e) => {
+                    // Mobile/desktop: toggle saat tap/click
+                    try {
+                      e?.originalEvent?.preventDefault?.()
+                      const t = e?.target
+                      t?.openTooltip?.()
+                      const el = t?.getTooltip?.()?.getElement?.()
+                      if (el) {
+                        const isShown = el.classList.contains('closure-show')
+                        el.classList.toggle('closure-show', !isShown)
+                        el.classList.toggle('closure-hidden', isShown)
+                      }
+                    } catch {}
+                  }
+                }}
+              >
+                <Tooltip
+                  permanent={false}
+                  sticky
+                  direction="top"
+                  offset={[0, -10]}
+                  className="closure-pill-tooltip closure-hidden"
+                  opacity={1}
+                >
+                  DITUTUP: {reason}
+                </Tooltip>
+
+                <Popup>
+                  <b>Ditutup</b><br />
+                  {reason}
+                </Popup>
+              </Polyline>
+            )
+          })}
+
+          {/* rute alternatif */}
+          {routes.fastest?.polyline && (
+            <Polyline
+              positions={routes.fastest.polyline.map((p) => [p.lat, p.lng])}
+              pathOptions={{
+                color: '#1d4ed8',
+                weight: selectedMode === 'fastest' ? 7 : 4,
+                opacity: selectedMode === 'fastest' ? 1 : 0.35
+              }}
             >
-              <TileLayer
-                attribution="&copy; OpenStreetMap contributors"
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              <ClickSetter mode={pickMode} onPick={onPick} />
+              <Tooltip sticky>
+                Tercepat • {fmtMin(routes.fastest?.total_time_sec)} • {fmtKm(routes.fastest?.total_length_m)}
+              </Tooltip>
+            </Polyline>
+          )}
 
-              {/* my position: arrow bearing */}
-              {myPos && (
-                <>
-                  <Marker position={[myPos.lat, myPos.lng]} icon={makeArrowIcon(bearing)}>
-                    <Popup>
-                      <b>Posisi Saya</b>
-                      <br />
-                      Bearing: {Math.round(bearing)}°
-                    </Popup>
-                  </Marker>
+          {routes.shortest?.polyline && (
+            <Polyline
+              positions={routes.shortest.polyline.map((p) => [p.lat, p.lng])}
+              pathOptions={{
+                color: '#7c3aed',
+                weight: selectedMode === 'shortest' ? 7 : 4,
+                opacity: selectedMode === 'shortest' ? 1 : 0.35,
+                dashArray: selectedMode === 'shortest' ? undefined : '6 10'
+              }}
+            >
+              <Tooltip sticky>
+                Terpendek • {fmtMin(routes.shortest?.total_time_sec)} • {fmtKm(routes.shortest?.total_length_m)}
+              </Tooltip>
+            </Polyline>
+          )}
 
-                  {/* fallback circle for visibility */}
-                  <CircleMarker center={[myPos.lat, myPos.lng]} radius={6} pathOptions={{ color: '#2563eb' }}>
-                    <Tooltip direction="top" offset={[0, -8]} opacity={0.9}>
-                      Saya
-                    </Tooltip>
-                  </CircleMarker>
-                </>
-              )}
-
-              {start && <Marker position={[start.lat, start.lng]}><Popup>Start</Popup></Marker>}
-              {end && <Marker position={[end.lat, end.lng]}><Popup>Tujuan</Popup></Marker>}
-
-              {/* closures merah */}
-              {closures.flatMap((c) =>
-                (c.edges || []).map((e, idx) =>
-                  Array.isArray(e.polyline) && e.polyline.length > 1 ? (
-                    <Polyline
-                      key={c.id + '_' + idx}
-                      positions={e.polyline.map((p) => [p.lat, p.lng])}
-                      pathOptions={{ color: 'red', weight: 6 }}
-                    >
-                      <Popup>
-                        <b>Ditutup</b><br />
-                        {c.reason || '-'}
-                      </Popup>
-                    </Polyline>
-                  ) : null
-                )
-              )}
-
-              {/* Rute alternatif: dipilih tebal, lainnya tipis */}
-              {routes.fastest?.polyline && (
-                <Polyline
-                  positions={routes.fastest.polyline.map((p) => [p.lat, p.lng])}
-                  pathOptions={{
-                    color: '#111',
-                    weight: selectedMode === 'fastest' ? 6 : 3,
-                    opacity: selectedMode === 'fastest' ? 1 : 0.35
-                  }}
-                >
-                  <Tooltip sticky>Tercepat</Tooltip>
-                </Polyline>
-              )}
-
-              {routes.shortest?.polyline && (
-                <Polyline
-                  positions={routes.shortest.polyline.map((p) => [p.lat, p.lng])}
-                  pathOptions={{
-                    color: '#111',
-                    weight: selectedMode === 'shortest' ? 6 : 3,
-                    opacity: selectedMode === 'shortest' ? 1 : 0.35,
-                    dashArray: selectedMode === 'shortest' ? undefined : '6 10'
-                  }}
-                >
-                  <Tooltip sticky>Terpendek</Tooltip>
-                </Polyline>
-              )}
-
-              {/* marker step berikutnya */}
-              {tracking && nextStep?.location ? (
-                <CircleMarker
-                  center={[nextStep.location.lat, nextStep.location.lng]}
-                  radius={6}
-                  pathOptions={{ color: '#10b981' }}
-                >
-                  <Popup>
-                    <b>Step berikutnya</b><br />
-                    {nextStep.instruction || '-'}
-                  </Popup>
-                </CircleMarker>
-              ) : null}
-            </MapContainer>
-          </div>
-        </div>
+          {tracking && nextStep?.location ? (
+            <CircleMarker
+              center={[nextStep.location.lat, nextStep.location.lng]}
+              radius={6}
+              pathOptions={{ color: '#10b981' }}
+            >
+              <Popup>
+                <b>Step berikutnya</b><br />
+                {nextStep.instruction || '-'}
+              </Popup>
+            </CircleMarker>
+          ) : null}
+        </MapContainer>
       </div>
     </div>
   )
