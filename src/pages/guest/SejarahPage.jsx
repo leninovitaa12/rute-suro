@@ -115,6 +115,14 @@ export default function SejarahPage() {
   return (
     <div className="min-h-screen bg-white">
       <style>{`
+        /* PLUS JAKARTA SANS — GLOBAL (SEMUA TEXT) */
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+        :root{
+          --app-font: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        }
+        * { font-family: var(--app-font) !important; }
+
         .s-hero {
           min-height: 90vh;
           background:
@@ -239,9 +247,12 @@ export default function SejarahPage() {
 
       {/* ══ 1. HERO ══ */}
       <section className="s-hero">
+        {/* HOME / ABOUT DIHAPUS */}
+
         <div className="relative z-10 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-[10px] font-bold uppercase tracking-[2.5px] text-white/85 mb-6">
           Warisan Budaya Dunia
         </div>
+
         <h1
           className="relative z-10 text-white font-black leading-[1.04] mb-3"
           style={{ fontSize: 'clamp(38px,7.5vw,82px)', letterSpacing: '-1.5px' }}
@@ -249,14 +260,21 @@ export default function SejarahPage() {
           Menelusuri Jejak
           <span
             className="block italic"
-            style={{ background: 'linear-gradient(135deg,#fca5a5,#f87171)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}
+            style={{
+              background: 'linear-gradient(135deg,#fca5a5,#f87171)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}
           >
             Grebeg Suro
           </span>
         </h1>
+
         <p className="relative z-10 text-white/70 max-w-lg leading-relaxed mb-10" style={{ fontSize: 'clamp(14px,2.5vw,17px)' }}>
           Kisah keberanian, spiritualitas, dan tradisi adiluhung yang membentuk identitas masyarakat Ponorogo selama berabad-abad.
         </p>
+
         <div className="scroll-caret"><IconChevronDown /></div>
       </section>
 

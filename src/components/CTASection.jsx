@@ -1,5 +1,3 @@
-// src/components/CTASection.jsx
-
 import { Link } from 'react-router-dom'
 
 const IconCalendar = () => (
@@ -23,6 +21,39 @@ export default function CTASection() {
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-[#7f1d1d] via-[#991b1b] to-[#b91c1c] py-20 px-6 text-center">
 
+      {/* ===== ORB ANIMATION STYLE ===== */}
+      <style>{`
+        @keyframes orbFloatSlow {
+          0% { transform: translateY(0px) translateX(0px); }
+          50% { transform: translateY(-18px) translateX(6px); }
+          100% { transform: translateY(0px) translateX(0px); }
+        }
+
+        @keyframes orbFloatMedium {
+          0% { transform: translateY(0px) translateX(0px); }
+          50% { transform: translateY(-24px) translateX(-8px); }
+          100% { transform: translateY(0px) translateX(0px); }
+        }
+
+        @keyframes orbFloatSoft {
+          0% { transform: translateY(0px); }
+          50% { transform: translateY(-14px); }
+          100% { transform: translateY(0px); }
+        }
+
+        .orb-1 {
+          animation: orbFloatSlow 14s ease-in-out infinite;
+        }
+
+        .orb-2 {
+          animation: orbFloatMedium 18s ease-in-out infinite;
+        }
+
+        .orb-3 {
+          animation: orbFloatSoft 12s ease-in-out infinite;
+        }
+      `}</style>
+
       {/* dot pattern */}
       <div
         className="pointer-events-none absolute inset-0"
@@ -33,19 +64,22 @@ export default function CTASection() {
       />
 
       {/* decorative orbs */}
-      <div className="pointer-events-none absolute -top-20 -right-20 w-80 h-80 rounded-full bg-white/5" />
-      <div className="pointer-events-none absolute -bottom-16 -left-16 w-64 h-64 rounded-full bg-white/[0.04]" />
-      <div className="pointer-events-none absolute top-1/2 left-1/4 -translate-y-1/2 w-40 h-40 rounded-full bg-white/[0.03]" />
+      <div className="pointer-events-none absolute -top-20 -right-20 w-80 h-80 rounded-full bg-white/5 orb-1" />
+      <div className="pointer-events-none absolute -bottom-16 -left-16 w-64 h-64 rounded-full bg-white/[0.04] orb-2" />
+      <div className="pointer-events-none absolute top-1/2 left-1/4 -translate-y-1/2 w-40 h-40 rounded-full bg-white/[0.03] orb-3" />
 
       {/* content */}
       <div className="relative z-10 max-w-2xl mx-auto">
         <h2 className="text-3xl sm:text-4xl font-black text-white mb-4 leading-tight tracking-tight">
           Rasakan Langsung Megahnya Tradisi
         </h2>
+
         <p className="text-white/70 text-base leading-relaxed mb-10">
           Lihat jadwal festival tahun ini dan temukan rute perjalananmu menuju jantung budaya Jawa.
         </p>
+
         <div className="flex flex-wrap gap-4 justify-center">
+
           <Link
             to="/jadwal"
             className="inline-flex items-center gap-2 px-7 py-3 bg-white text-[#991b1b] font-bold text-[15px] rounded-[7px] border-2 border-white transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_26px_rgba(0,0,0,0.18)] hover:bg-gray-50"
@@ -53,6 +87,7 @@ export default function CTASection() {
             <IconCalendar />
             Lihat Jadwal
           </Link>
+
           <Link
             to="/map"
             className="inline-flex items-center gap-2 px-7 py-3 bg-white/10 text-white font-bold text-[15px] rounded-[7px] border-2 border-white/40 backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:bg-white/20 hover:border-white/80"
@@ -60,8 +95,10 @@ export default function CTASection() {
             <IconMap />
             Lihat Peta
           </Link>
+
         </div>
       </div>
+
     </section>
   )
 }

@@ -1,16 +1,28 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
   const location = useLocation()
+
+  // ✅ aman untuk /map, /map/, dll (query tidak ikut pathname)
+  const isMapPage = location.pathname.startsWith('/map')
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 40)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   const navLinks = [
     { to: '/', label: 'Home' },
     { to: '/map', label: 'Map' },
-    { to: '/tentang', label: 'Tentang' },
     { to: '/sejarah', label: 'Sejarah' },
     { to: '/jadwal', label: 'Jadwal' },
+    { to: '/tentang', label: 'Tentang' },
   ]
 
   const isActive = (path) => {
@@ -19,7 +31,19 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="sticky top-0 z-50 bg-red-800 text-white shadow-lg backdrop-blur-sm bg-red-800/95">
+    <nav
+      className={`
+        fixed top-0 w-full text-white transition-all duration-300
+        z-[10000]
+        ${
+          isMapPage
+            ? 'bg-red-800 shadow-lg'
+            : isScrolled
+            ? 'bg-red-800/95 shadow-lg backdrop-blur-sm'
+            : 'bg-transparent'
+        }
+      `}
+    >
       <style>{`
         @keyframes slideDown {
           from { transform: translateY(-100%); opacity: 0; }
@@ -59,7 +83,6 @@ export default function Navbar() {
         .nav-link:hover { color: #fca5a5; transform: translateY(-1px); }
         .nav-link:hover::after { width: 100%; }
 
-        /* active state — underline always visible */
         .nav-link.active { color: #fca5a5; }
         .nav-link.active::after { width: 100%; }
 
@@ -73,7 +96,6 @@ export default function Navbar() {
         .menu-item:nth-child(5) { animation-delay: 0.25s; }
         .menu-item:nth-child(6) { animation-delay: 0.30s; }
 
-        /* mobile active link */
         .mobile-link {
           display: block;
           padding: 12px 16px;
@@ -152,6 +174,7 @@ export default function Navbar() {
             <Link to="/admin" className="btn-admin hidden md:inline-flex items-center">
               Admin Login
             </Link>
+
             <button
               className="md:hidden text-white p-2 text-2xl transition-transform hover:scale-110 active:scale-95"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
