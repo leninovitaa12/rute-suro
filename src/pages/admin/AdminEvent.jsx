@@ -40,7 +40,7 @@ const mockEventsData = [
   }
 ]
 
-// ✅ helper ISO (tanpa mengubah tampilan)
+//  helper ISO (tanpa mengubah tampilan)
 function toIsoOrNull(dtLocal) {
   if (!dtLocal) return null
   const d = new Date(dtLocal)
@@ -129,7 +129,7 @@ export default function AdminEvent() {
     }
 
     try {
-      // ✅ FIX: konversi time -> ISO, biar Supabase timestamptz aman
+      // konversi time -> ISO, biar Supabase timestamptz aman
       const payload = {
         name: formData.name,
         description: formData.description || null,
@@ -153,7 +153,6 @@ export default function AdminEvent() {
       setMarkerPos({ lat: DEFAULT_CENTER[0], lng: DEFAULT_CENTER[1] })
     } catch (err) {
       console.error('[AdminEvent] Error saving event:', err)
-      // ✅ error lebih jelas tanpa ubah layout
       alert('Error: ' + (err?.message || 'Gagal menyimpan event ke backend'))
     }
   }
