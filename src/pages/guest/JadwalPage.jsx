@@ -1,21 +1,60 @@
-// src/pages/guest/JadwalPage.jsx
-// ✅ UI upgrade — fungsi tidak berubah | Highlight section removed
-
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api.js'
 import dayjs from 'dayjs'
 
+// ── Reverse Geocode Helper (Nominatim OpenStreetMap, gratis) ──
+async function reverseGeocode(lat, lng) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=id`,
+      { headers: { 'Accept-Language': 'id' } }
+    )
+    const data = await res.json()
+    if (data && data.address) {
+      const a = data.address
+      // Prioritaskan nama jalan/kelurahan/kecamatan/kota
+      return (
+        a.road ||
+        a.neighbourhood ||
+        a.suburb ||
+        a.village ||
+        a.town ||
+        a.city_district ||
+        a.city ||
+        a.county ||
+        data.display_name?.split(',')[0] ||
+        `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+      )
+    }
+  } catch (_) {}
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+}
+
 export default function JadwalPage() {
   const [events, setEvents] = React.useState([])
   const [loading, setLoading] = React.useState(true)
   const [filter, setFilter] = React.useState('all')
+  // Cache hasil geocoding: { "lat,lng": "nama lokasi" }
+  const [locationNames, setLocationNames] = React.useState({})
 
   React.useEffect(() => {
     async function loadEvents() {
       try {
         const res = await api.get('/events')
-        setEvents(res.data || [])
+        const data = res.data || []
+        setEvents(data)
+
+        // Geocode semua event secara paralel (deduplicate by key)
+        const uniqueKeys = [...new Set(data.map(e => `${e.lat},${e.lng}`))]
+        const results = await Promise.all(
+          uniqueKeys.map(async key => {
+            const [lat, lng] = key.split(',').map(Number)
+            const name = await reverseGeocode(lat, lng)
+            return [key, name]
+          })
+        )
+        setLocationNames(Object.fromEntries(results))
       } catch (error) {
         console.error('Error loading events:', error)
       } finally {
@@ -26,12 +65,20 @@ export default function JadwalPage() {
   }, [])
 
   const now = dayjs()
+
+  const getStatus = (event) => {
+    const startTime = event.start_time ? dayjs(event.start_time) : null
+    const endTime   = event.end_time   ? dayjs(event.end_time)   : null
+    if (startTime && startTime.isAfter(now)) return 'upcoming'
+    if (endTime && endTime.isBefore(now))    return 'past'
+    return 'ongoing'
+  }
+
   const filteredEvents = events.filter(event => {
     if (filter === 'all') return true
-    if (filter === 'upcoming') return event.start_time && dayjs(event.start_time).isAfter(now)
-    if (filter === 'past') return event.end_time && dayjs(event.end_time).isBefore(now)
-    return true
+    return getStatus(event) === filter
   })
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -89,29 +136,78 @@ export default function JadwalPage() {
         .filter-btn.active::before { transform: scaleX(1); }
         .filter-btn:not(.active):hover { border-color: #991b1b; color: #991b1b; transform: translateY(-1px); }
 
-        /* outline red button */
-        .btn-outline-red {
-          display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-          padding: 10px 24px; border: 2px solid #991b1b;
-          color: #991b1b; font-weight: 700; font-size: 14px;
-          border-radius: 6px; text-decoration: none; background: transparent;
-          position: relative; overflow: hidden; width: 100%;
-          transition: color 0.3s, transform 0.2s, box-shadow 0.3s;
+        /* ── Button "Lihat di Map" — smooth hover tanpa gradien ── */
+        .btn-map {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          width: 100%;
+          padding: 11px 24px;
+          border: 2px solid #991b1b;
+          border-radius: 8px;
+          background: transparent;
+          color: #991b1b;
+          font-weight: 700;
+          font-size: 14px;
+          text-decoration: none;
+          cursor: pointer;
+          /* Smooth transition semua property */
+          transition:
+            background-color 0.25s ease,
+            color 0.25s ease,
+            transform 0.25s ease,
+            box-shadow 0.25s ease;
         }
-        .btn-outline-red::before {
-          content: ''; position: absolute; inset: 0;
-          background: linear-gradient(135deg, #991b1b, #dc2626);
-          transform: scaleX(0); transform-origin: left;
-          transition: transform 0.35s cubic-bezier(0.34,1.2,0.64,1); z-index: 0;
+        .btn-map:hover {
+          background-color: #991b1b;
+          color: white;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(153,27,27,0.25);
         }
-        .btn-outline-red:hover::before { transform: scaleX(1); }
-        .btn-outline-red:hover { color: white; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(153,27,27,0.22); }
-        .btn-outline-red span { position: relative; z-index: 1; }
+        .btn-map:active {
+          transform: translateY(0px);
+          box-shadow: 0 4px 10px rgba(153,27,27,0.18);
+        }
+        /* Icon panah di dalam tombol */
+        .btn-map-icon {
+          width: 16px; height: 16px;
+          transition: transform 0.25s ease;
+          flex-shrink: 0;
+        }
+        .btn-map:hover .btn-map-icon {
+          transform: translateX(3px);
+        }
 
         .green-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:#16a34a; }
 
         /* jadwal hero bubbles */
         .jadwal-hero-bubbles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
+        /* Lokasi pill */
+        .loc-pill {
+          display: inline-flex; align-items: center; gap: 5px;
+          background: #fef2f2; border: 1px solid #fecaca;
+          border-radius: 6px; padding: 4px 10px;
+          font-size: 13px; font-weight: 600; color: #991b1b;
+          max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .loc-skeleton {
+          display: inline-block;
+          width: 120px; height: 18px;
+          background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.4s infinite;
+          border-radius: 4px;
+        }
+        @keyframes shimmer {
+          0%   { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%       { opacity: 0.5; transform: scale(1.4); }
+        }
       `}</style>
 
       {/* ── HEADER ── */}
@@ -137,17 +233,18 @@ export default function JadwalPage() {
 
           {/* filter */}
           <div className="flex flex-wrap gap-3 mb-10">
-            {['all', 'upcoming', 'past'].map(f => (
+            {[
+              { key: 'all',      label: 'Semua Event' },
+              { key: 'ongoing',  label: 'Berlangsung' },
+              { key: 'upcoming', label: 'Akan Datang' },
+              { key: 'past',     label: 'Selesai'     },
+            ].map(({ key, label }) => (
               <button
-                key={f}
-                className={`filter-btn${filter === f ? ' active' : ''}`}
-                onClick={() => setFilter(f)}
+                key={key}
+                className={`filter-btn${filter === key ? ' active' : ''}`}
+                onClick={() => setFilter(key)}
               >
-                <span>
-                  {f === 'all' && 'Semua Event'}
-                  {f === 'upcoming' && 'Akan Datang'}
-                  {f === 'past' && 'Selesai'}
-                </span>
+                <span>{label}</span>
               </button>
             ))}
           </div>
@@ -166,16 +263,26 @@ export default function JadwalPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredEvents.map(event => {
-                const startTime = event.start_time ? dayjs(event.start_time) : null
-                const endTime   = event.end_time   ? dayjs(event.end_time)   : null
-                const isUpcoming = startTime && startTime.isAfter(now)
-                const isPast     = endTime   && endTime.isBefore(now)
+                const startTime  = event.start_time ? dayjs(event.start_time) : null
+                const endTime    = event.end_time   ? dayjs(event.end_time)   : null
+                const status     = getStatus(event)
+                const isUpcoming = status === 'upcoming'
+                const isPast     = status === 'past'
+                const isOngoing  = status === 'ongoing'
+                const locKey     = `${event.lat},${event.lng}`
+                const locName    = locationNames[locKey]
+
                 return (
                   <div key={event.id} className="j-card">
                     <div style={{ padding:'10px 16px', borderBottom:'1px solid #f3f4f6', background:'#fafafa', position:'relative', zIndex:1 }}>
                       {isPast     && <span style={{ padding:'3px 12px', background:'#6b7280', color:'white', fontSize:'11px', fontWeight:700, borderRadius:'999px', letterSpacing:'1px' }}>SELESAI</span>}
                       {isUpcoming && <span style={{ padding:'3px 12px', background:'#2563eb', color:'white', fontSize:'11px', fontWeight:700, borderRadius:'999px', letterSpacing:'1px' }}>AKAN DATANG</span>}
-                      {!isPast && !isUpcoming && <span style={{ padding:'3px 12px', background:'#16a34a', color:'white', fontSize:'11px', fontWeight:700, borderRadius:'999px', letterSpacing:'1px' }}>BERLANGSUNG</span>}
+                      {isOngoing  && (
+                        <span style={{ display:'inline-flex', alignItems:'center', gap:'5px', padding:'3px 12px', background:'#16a34a', color:'white', fontSize:'11px', fontWeight:700, borderRadius:'999px', letterSpacing:'1px' }}>
+                          <span style={{ width:'6px', height:'6px', borderRadius:'50%', background:'#bbf7d0', display:'inline-block', animation:'pulse 1.5s infinite' }} />
+                          BERLANGSUNG
+                        </span>
+                      )}
                     </div>
                     <div style={{ padding:'24px', position:'relative', zIndex:1 }}>
                       <h3 style={{ fontSize:'17px', fontWeight:700, color:'#111827', marginBottom:'10px' }}>{event.name}</h3>
@@ -184,7 +291,7 @@ export default function JadwalPage() {
                           {event.description}
                         </p>
                       )}
-                      <div style={{ display:'flex', flexDirection:'column', gap:'8px', marginBottom:'20px' }}>
+                      <div style={{ display:'flex', flexDirection:'column', gap:'10px', marginBottom:'20px' }}>
                         {startTime && (
                           <div style={{ fontSize:'13px' }}>
                             <p style={{ color:'#9ca3af', fontWeight:600, marginBottom:'2px' }}>Tanggal & Waktu</p>
@@ -192,15 +299,29 @@ export default function JadwalPage() {
                             {endTime && <p style={{ color:'#6b7280', fontSize:'12px' }}>s/d {endTime.format('DD MMM YYYY, HH:mm')} WIB</p>}
                           </div>
                         )}
+                        {/* Lokasi — tampilkan nama hasil reverse geocode */}
                         <div style={{ fontSize:'13px' }}>
-                          <p style={{ color:'#9ca3af', fontWeight:600, marginBottom:'2px' }}>Lokasi</p>
-                          <p style={{ color:'#111827', fontWeight:600, fontFamily:'monospace', fontSize:'12px' }}>
-                            {event.lat.toFixed(5)}, {event.lng.toFixed(5)}
-                          </p>
+                          <p style={{ color:'#9ca3af', fontWeight:600, marginBottom:'5px' }}>Lokasi</p>
+                          {locName ? (
+                            <span className="loc-pill">
+                              {/* Pin icon */}
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink:0 }}>
+                                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                              </svg>
+                              {locName}
+                            </span>
+                          ) : (
+                            <span className="loc-skeleton" />
+                          )}
                         </div>
                       </div>
-                      <Link to={`/map?eventId=${event.id}`} className="btn-outline-red">
-                        <span>Lihat di Map</span>
+
+                      {/* Button Lihat di Map — smooth hover tanpa gradien */}
+                      <Link to={`/map?eventId=${event.id}`} className="btn-map">
+                        Lihat di Map
+                        <svg className="btn-map-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
                       </Link>
                     </div>
                   </div>

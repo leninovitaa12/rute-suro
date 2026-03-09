@@ -74,8 +74,7 @@ export default function AdminLogin() {
           <h2 style={{fontSize: '28px', fontWeight: 'bold', textAlign: 'center', marginBottom: '10px', color: '#333'}}>Admin Login</h2>
           
           <div style={{textAlign: 'center', marginBottom: '30px', fontSize: '14px', color: '#666'}}>
-            <p style={{marginBottom: '8px'}}>Gunakan akun Supabase Anda:</p>
-            <p style={{color: '#888', fontSize: '12px'}}>Email dan password yang terdaftar di Supabase</p>
+            <p style={{marginBottom: '8px'}}>Gunakan akun yang sudah terdaftar:</p>
           </div>
           
           <form onSubmit={login}>

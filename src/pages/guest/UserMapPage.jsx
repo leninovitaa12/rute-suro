@@ -1187,20 +1187,6 @@ export default function UserMapPage() {
               </p>
             )}
           </div>
-
-          {/* ── Footer actions ── */}
-          <SectionDivider label="" />
-          <div className="flex items-center justify-between px-1">
-            <button className="flex items-center gap-1.5 text-xs text-[#6B6560] hover:text-[#2B3440] font-bold transition py-1">
-              <IconClock className="w-3.5 h-3.5" />
-              Riwayat
-            </button>
-            <button className="flex items-center gap-1.5 text-xs text-[#6B6560] hover:text-[#8b1a1a] font-bold transition py-1">
-              <IconHeart className="w-3.5 h-3.5" />
-              Favorit
-            </button>
-          </div>
-
         </RightDockPanel>
 
         {/* ── Map ── */}

@@ -1,5 +1,3 @@
-// src/pages/guest/SejarahPage.jsx
-
 import React, { useState, useEffect, useRef } from 'react'
 import { getSejarah } from '../../lib/backendApi'
 import CTASection from '../../components/CTASection'
@@ -123,22 +121,51 @@ export default function SejarahPage() {
         }
         * { font-family: var(--app-font) !important; }
 
+        /* FIX 1: Hero full screen, no white gap below, text tidak terpotong */
         .s-hero {
-          min-height: 90vh;
+          height: 100vh;
+          min-height: 600px;
           background:
             linear-gradient(160deg, rgba(60,3,3,0.92) 0%, rgba(110,8,8,0.78) 45%, rgba(15,1,1,0.62) 100%),
             url('/images/sejarah-1.jpg') center/cover no-repeat;
-          display: flex; flex-direction: column;
-          align-items: center; justify-content: center;
-          text-align: center; color: white;
-          padding: 100px 24px 60px;
-          position: relative; overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          /* Geser center ke bawah sedikit untuk kompensasi navbar 64px */
+          justify-content: center;
+          padding-top: 64px;
+          text-align: center;
+          color: white;
+          padding-left: 24px;
+          padding-right: 24px;
+          padding-bottom: 60px;
+          position: relative;
+          overflow: visible;
+          box-sizing: border-box;
         }
         .s-hero::after {
           content: ''; position: absolute; inset: 0; pointer-events: none;
           background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
           background-size: 28px 28px;
         }
+
+        /* FIX: Judul hero tidak terpotong di mobile */
+        .s-hero-title {
+          position: relative;
+          z-index: 10;
+          font-weight: 900;
+          color: white;
+          line-height: 1.1;
+          margin-bottom: 12px;
+          /* Font size lebih kecil dan safe di semua ukuran layar */
+          font-size: clamp(28px, 5.5vw, 76px);
+          letter-spacing: -1px;
+          word-break: keep-all;
+          overflow-wrap: normal;
+          /* Pastikan tidak ada overflow tersembunyi */
+          overflow: visible;
+        }
+
         @keyframes bounceY {
           0%,100% { transform: translateY(0); opacity: .4; }
           50%      { transform: translateY(10px); opacity: .9; }
@@ -177,24 +204,63 @@ export default function SejarahPage() {
           display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
 
-        /* TIMELINE */
+        /* ── TIMELINE ── */
         .tl-wrap { position: relative; }
         .tl-axis {
           position: absolute; left: 50%; transform: translateX(-50%);
           width: 2px; top: 0; bottom: 0;
           background: linear-gradient(to bottom, transparent, #dc2626 12%, #dc2626 88%, transparent);
         }
+
+        /* FIX 3: Mobile timeline — semua item stack ke kiri, axis di kiri, SEMUA kartu terbaca */
         @media (max-width: 767px) {
-          .tl-axis { left: 22px; transform: none; }
-          .tl-row  { grid-template-columns: 48px 1fr !important; }
+          .tl-axis {
+            left: 22px;
+            transform: none;
+          }
+          .tl-row {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: flex-start !important;
+            gap: 12px !important;
+            margin-bottom: 32px !important;
+            padding-left: 0 !important;
+          }
           .tl-left-cell { display: none !important; }
-          .tl-center-cell { justify-content: flex-start !important; }
+          .tl-center-cell {
+            flex-shrink: 0 !important;
+            display: flex !important;
+            justify-content: center !important;
+          }
+          /* Right cell selalu tampil di mobile, baik side left maupun right */
+          .tl-right-cell {
+            flex: 1 !important;
+            padding-left: 0 !important;
+          }
+          /* Ghost di kanan untuk left-side items juga disembunyikan di mobile */
+          .tl-right-cell .tl-ghost { display: none !important; }
+          /* Kartu yang biasanya di kiri (side=left), di mobile dipindah ke kanan */
+          .tl-mobile-card {
+            display: block !important;
+          }
+          .tl-desktop-only {
+            display: none !important;
+          }
         }
-        .tl-row {
-          display: grid; grid-template-columns: 1fr 60px 1fr;
-          align-items: center; margin-bottom: 48px;
-          position: relative; z-index: 1;
+        @media (min-width: 768px) {
+          .tl-mobile-card { display: none !important; }
+          .tl-desktop-only { display: block !important; }
+          .tl-row {
+            display: grid;
+            grid-template-columns: 1fr 60px 1fr;
+            align-items: center;
+            margin-bottom: 48px;
+            position: relative;
+            z-index: 1;
+          }
+          .tl-right-cell { padding-left: 24px; }
         }
+
         .tl-center-cell { display: flex; justify-content: center; }
         .tl-dot {
           width: 46px; height: 46px; border-radius: 50%;
@@ -243,20 +309,53 @@ export default function SejarahPage() {
         .fu.d2 { animation-delay: .18s; }
         .fu.d3 { animation-delay: .28s; }
         .fu.d4 { animation-delay: .38s; }
+
+        /* FIX 2: Legenda — kurangi padding dan optimalkan gap agar lebih compact */
+        .s-legenda {
+          padding-top: 56px;
+          padding-bottom: 56px;
+        }
+        .s-legenda-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 32px;
+          align-items: center;
+        }
+        @media (max-width: 767px) {
+          .s-legenda-grid {
+            grid-template-columns: 1fr;
+            gap: 20px;
+          }
+          .s-legenda-img {
+            min-height: 280px !important;
+            height: 280px !important;
+          }
+        }
+        .s-legenda-img {
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+          transition: transform .5s ease;
+          min-height: 400px;
+          height: 400px;
+        }
+        .s-legenda-img:hover { transform: scale(1.01); }
+        .s-legenda-img img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
       `}</style>
 
       {/* ══ 1. HERO ══ */}
       <section className="s-hero">
-        {/* HOME / ABOUT DIHAPUS */}
-
-        <div className="relative z-10 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-[10px] font-bold uppercase tracking-[2.5px] text-white/85 mb-6">
+        <div className="relative z-10 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-[10px] font-bold uppercase tracking-[2.5px] text-white/85 mb-5">
           Warisan Budaya Dunia
         </div>
 
-        <h1
-          className="relative z-10 text-white font-black leading-[1.04] mb-3"
-          style={{ fontSize: 'clamp(38px,7.5vw,82px)', letterSpacing: '-1.5px' }}
-        >
+        {/* FIX: h1 pakai class khusus agar tidak terpotong di mobile */}
+        <h1 className="s-hero-title">
           Menelusuri Jejak
           <span
             className="block italic"
@@ -271,7 +370,7 @@ export default function SejarahPage() {
           </span>
         </h1>
 
-        <p className="relative z-10 text-white/70 max-w-lg leading-relaxed mb-10" style={{ fontSize: 'clamp(14px,2.5vw,17px)' }}>
+        <p className="relative z-10 text-white/70 max-w-lg leading-relaxed mb-8" style={{ fontSize: 'clamp(14px,2.5vw,17px)' }}>
           Kisah keberanian, spiritualitas, dan tradisi adiluhung yang membentuk identitas masyarakat Ponorogo selama berabad-abad.
         </p>
 
@@ -334,9 +433,10 @@ export default function SejarahPage() {
       </section>
 
       {/* ══ 3. LEGENDA ══ */}
-      <section ref={legendRef} className="py-16 sm:py-20 bg-gray-50">
+      {/* FIX 2: section legenda lebih compact, gambar & teks lebih besar */}
+      <section ref={legendRef} className="s-legenda bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <h2
               className="font-black text-gray-900 mb-3"
               style={{ fontSize: 'clamp(22px,4vw,34px)', letterSpacing: '-0.4px' }}
@@ -346,22 +446,20 @@ export default function SejarahPage() {
             <div className="w-11 h-0.5 mx-auto rounded-full" style={{ background: 'linear-gradient(90deg,#991b1b,#dc2626)' }} />
           </div>
 
-          <div className={`grid grid-cols-1 md:grid-cols-2 gap-10 items-stretch fu${legendInView ? ' on' : ''}`}>
-            {/* Image — taller */}
-            <div className="rounded-2xl overflow-hidden shadow-xl transition-transform duration-500 hover:scale-[1.01]" style={{ minHeight: '480px' }}>
+          <div className={`s-legenda-grid fu${legendInView ? ' on' : ''}`}>
+            {/* Image — lebih besar dan fit */}
+            <div className="s-legenda-img">
               <img
                 src="/images/sejarah-1.jpg"
                 alt="Wayang Ponorogo"
-                className="w-full h-full object-cover block"
-                style={{ minHeight: '480px' }}
               />
             </div>
             {/* Text */}
-            <div className="flex flex-col justify-center gap-5">
-              <p className="text-gray-700 leading-[1.85] text-[15px]">
+            <div className="flex flex-col justify-center gap-6">
+              <p className="text-gray-700 leading-[1.85] text-[16px]">
                 Akar dari Grebeg Suro tak lepas dari legenda Prabu Kelono Sewandono dari Kerajaan Bantarangin. Kisahnya melamar Dewi Sanggalangit dari Kediri menciptakan syarat berupa pertunjukan seni yang belum pernah ada sebelumnya.
               </p>
-              <p className="text-gray-500 leading-[1.85] text-[15px]">
+              <p className="text-gray-500 leading-[1.85] text-[16px]">
                 Perjalanan sang Prabu yang diiringi oleh pasukan berkuda Jatil dan Bujang Ganong inilah yang kemudian menjadi cikal bakal kesenian Reog Ponorogo yang megah.
               </p>
             </div>
@@ -386,11 +484,14 @@ export default function SejarahPage() {
             <p className="text-gray-400 text-[15px]">Transformasi Grebeg Suro dari masa ke masa</p>
           </div>
 
+          {/* FIX 3: Timeline mobile — semua item tampil, kartu kiri dipindah ke kanan di mobile */}
           <div className="tl-wrap">
             <div className="tl-axis" />
             {TIMELINE_STATIC.map(({ era, side, Icon, desc }, idx) => (
               <div key={idx} className={`tl-row fu${tlInView ? ' on' : ''} d${idx + 1}`}>
-                <div className="tl-left-cell" style={{ paddingRight: '24px', textAlign: 'right' }}>
+
+                {/* Kolom kiri — hanya desktop, side=left tampil kartu, side=right tampil ghost */}
+                <div className="tl-left-cell tl-desktop-only" style={{ paddingRight: '24px', textAlign: 'right' }}>
                   {side === 'left' ? (
                     <div className="tl-card text-left">
                       <p className="text-[11px] font-extrabold text-[#991b1b] uppercase tracking-wide mb-1.5">{era}</p>
@@ -400,19 +501,34 @@ export default function SejarahPage() {
                     <div className="tl-ghost"><Icon /></div>
                   )}
                 </div>
+
+                {/* Dot tengah */}
                 <div className="tl-center-cell">
                   <div className="tl-dot"><Icon /></div>
                 </div>
-                <div style={{ paddingLeft: '24px' }}>
-                  {side === 'right' ? (
+
+                {/* Kolom kanan — desktop: side=right tampil kartu; mobile: SEMUA item tampil kartu */}
+                <div className="tl-right-cell">
+                  {/* Desktop: side=right → kartu, side=left → ghost */}
+                  <div className="tl-desktop-only">
+                    {side === 'right' ? (
+                      <div className="tl-card">
+                        <p className="text-[11px] font-extrabold text-[#991b1b] uppercase tracking-wide mb-1.5">{era}</p>
+                        <p className="text-[13px] text-gray-500 leading-relaxed">{desc}</p>
+                      </div>
+                    ) : (
+                      <div className="tl-ghost"><Icon /></div>
+                    )}
+                  </div>
+                  {/* Mobile: semua item selalu tampil kartu di sini */}
+                  <div className="tl-mobile-card">
                     <div className="tl-card">
                       <p className="text-[11px] font-extrabold text-[#991b1b] uppercase tracking-wide mb-1.5">{era}</p>
                       <p className="text-[13px] text-gray-500 leading-relaxed">{desc}</p>
                     </div>
-                  ) : (
-                    <div className="tl-ghost"><Icon /></div>
-                  )}
+                  </div>
                 </div>
+
               </div>
             ))}
           </div>
