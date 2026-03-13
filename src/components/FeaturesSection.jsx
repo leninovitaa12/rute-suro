@@ -1,5 +1,3 @@
-// src/components/FeaturesSection.jsx
-
 export default function FeaturesSection() {
   const features = [
     {

@@ -1,4 +1,3 @@
-// src/lib/backendApi.js
 import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE || 'http://localhost:5000'
@@ -11,9 +10,7 @@ export const backendApi = axios.create({
   }
 })
 
-// ================================================================
 // EVENTS API
-// ================================================================
 
 export const getEvents = async () => {
   try {
@@ -25,9 +22,7 @@ export const getEvents = async () => {
   }
 }
 
-// ================================================================
 // CLOSURES API
-// ================================================================
 
 export const getClosures = async (active = false) => {
   try {
@@ -45,9 +40,7 @@ export const getActiveClosures = async () => {
   return getClosures(true)
 }
 
-// ================================================================
 // ROUTE CALCULATION API
-// ================================================================
 
 export const calculateRoute = async (startLat, startLng, endLat, endLng) => {
   try {
@@ -62,9 +55,7 @@ export const calculateRoute = async (startLat, startLng, endLat, endLng) => {
   }
 }
 
-// ================================================================
 // ADMIN API (Edge Derivation)
-// ================================================================
 
 export const deriveEdges = async (pointALat, pointALng, pointBLat, pointBLng) => {
   try {
@@ -79,9 +70,7 @@ export const deriveEdges = async (pointALat, pointALng, pointBLat, pointBLng) =>
   }
 }
 
-// ================================================================
 // SUPABASE CLOSURES API (CRUD Operations)
-// ================================================================
 
 import { supabase } from './supabase'
 
@@ -131,9 +120,7 @@ export const deleteClosure = async (closureId) => {
   }
 }
 
-// ================================================================
 // SUPABASE EVENTS API (CRUD Operations)
-// ================================================================
 
 export const createEvent = async (eventData) => {
   try {
@@ -181,9 +168,7 @@ export const deleteEvent = async (eventId) => {
   }
 }
 
-// ================================================================
 // SUPABASE SEJARAH API (CRUD Operations)
-// ================================================================
 
 export const getSejarah = async () => {
   try {
@@ -246,9 +231,7 @@ export const deleteSejarah = async (sejarahId) => {
   }
 }
 
-// ================================================================
 // SUPABASE TENTANG API (CRUD Operations)
-// ================================================================
 
 export const getTentang = async () => {
   try {
@@ -307,6 +290,74 @@ export const deleteTentang = async (tentangId) => {
     return true
   } catch (error) {
     console.error('[backendApi] Error deleting tentang:', error.message)
+    throw error
+  }
+}
+
+// SUPABASE PARKING SPOTS API (CRUD Operations)
+
+export const getParkingSpots = async (eventId = null) => {
+  try {
+    let query = supabase
+      .from('parking_spots')
+      .select('*')
+      .order('created_at', { ascending: true })
+
+    if (eventId) {
+      query = query.eq('event_id', eventId)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.error('[backendApi] Error fetching parking spots:', error.message)
+    throw error
+  }
+}
+
+export const createParkingSpot = async (spotData) => {
+  try {
+    const { data, error } = await supabase
+      .from('parking_spots')
+      .insert([spotData])
+      .select()
+
+    if (error) throw error
+    return data?.[0]
+  } catch (error) {
+    console.error('[backendApi] Error creating parking spot:', error.message)
+    throw error
+  }
+}
+
+export const updateParkingSpot = async (spotId, spotData) => {
+  try {
+    const { data, error } = await supabase
+      .from('parking_spots')
+      .update(spotData)
+      .eq('id', spotId)
+      .select()
+
+    if (error) throw error
+    return data?.[0]
+  } catch (error) {
+    console.error('[backendApi] Error updating parking spot:', error.message)
+    throw error
+  }
+}
+
+export const deleteParkingSpot = async (spotId) => {
+  try {
+    const { error } = await supabase
+      .from('parking_spots')
+      .delete()
+      .eq('id', spotId)
+
+    if (error) throw error
+    return true
+  } catch (error) {
+    console.error('[backendApi] Error deleting parking spot:', error.message)
     throw error
   }
 }

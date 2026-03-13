@@ -1,31 +1,34 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { getEvents, getClosures, getSejarah, getTentang } from '../../lib/backendApi'
+import { getEvents, getClosures, getSejarah, getTentang, getParkingSpots } from '../../lib/backendApi'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const [stats, setStats] = useState({
-    totalEvents: null,
+    totalEvents:    null,
     activeClosures: null,
-    totalSejarah: null,
-    totalTentang: null,
+    totalSejarah:   null,
+    totalTentang:   null,
+    totalParking:   null,
   })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [events, closures, sejarah, tentang] = await Promise.allSettled([
+        const [events, closures, sejarah, tentang, parking] = await Promise.allSettled([
           getEvents(),
           getClosures(false),
           getSejarah(),
           getTentang(),
+          getParkingSpots(),
         ])
         setStats({
-          totalEvents:    events.status    === 'fulfilled' ? (events.value?.length    ?? 0) : 0,
-          activeClosures: closures.status  === 'fulfilled' ? (closures.value?.length  ?? 0) : 0,
-          totalSejarah:   sejarah.status   === 'fulfilled' ? (sejarah.value?.length   ?? 0) : 0,
-          totalTentang:   tentang.status   === 'fulfilled' ? (tentang.value?.length   ?? 0) : 0,
+          totalEvents:    events.status   === 'fulfilled' ? (events.value?.length   ?? 0) : 0,
+          activeClosures: closures.status === 'fulfilled' ? (closures.value?.length ?? 0) : 0,
+          totalSejarah:   sejarah.status  === 'fulfilled' ? (sejarah.value?.length  ?? 0) : 0,
+          totalTentang:   tentang.status  === 'fulfilled' ? (tentang.value?.length  ?? 0) : 0,
+          totalParking:   parking.status  === 'fulfilled' ? (parking.value?.length  ?? 0) : 0,
         })
       } catch {
         // biarkan null
@@ -38,23 +41,24 @@ export default function AdminDashboard() {
 
   const statCards = [
     {
-      label: 'Total Event',
-      value: stats.totalEvents,
-      desc: 'Event terdaftar',
-      iconBg: 'bg-red-100',
+      label:     'Total Event',
+      value:     stats.totalEvents,
+      desc:      'Event terdaftar',
+      iconBg:    'bg-red-100',
       iconColor: 'text-red-600',
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       ),
+      // FIXED: path harus sama dengan route yang didaftarkan di router
       action: () => navigate('/admin/dashboard/event'),
     },
     {
-      label: 'Rekayasa Aktif',
-      value: stats.activeClosures,
-      desc: 'Penutupan & pengalihan',
-      iconBg: 'bg-orange-100',
+      label:     'Rekayasa Aktif',
+      value:     stats.activeClosures,
+      desc:      'Penutupan & pengalihan',
+      iconBg:    'bg-orange-100',
       iconColor: 'text-orange-600',
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -64,10 +68,10 @@ export default function AdminDashboard() {
       action: () => navigate('/admin/dashboard/traffic'),
     },
     {
-      label: 'Konten Sejarah',
-      value: stats.totalSejarah,
-      desc: 'Artikel sejarah',
-      iconBg: 'bg-blue-100',
+      label:     'Konten Sejarah',
+      value:     stats.totalSejarah,
+      desc:      'Artikel sejarah',
+      iconBg:    'bg-blue-100',
       iconColor: 'text-blue-600',
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,10 +81,10 @@ export default function AdminDashboard() {
       action: () => navigate('/admin/dashboard/sejarah'),
     },
     {
-      label: 'Konten Tentang',
-      value: stats.totalTentang,
-      desc: 'Informasi tentang',
-      iconBg: 'bg-green-100',
+      label:     'Konten Tentang',
+      value:     stats.totalTentang,
+      desc:      'Informasi tentang',
+      iconBg:    'bg-green-100',
       iconColor: 'text-green-600',
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -89,16 +93,29 @@ export default function AdminDashboard() {
       ),
       action: () => navigate('/admin/dashboard/tentang'),
     },
+    {
+      label:     'Titik Parkir',
+      value:     stats.totalParking,
+      desc:      'Parkir semua event',
+      iconBg:    'bg-indigo-100',
+      iconColor: 'text-indigo-600',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+        </svg>
+      ),
+      action: () => navigate('/admin/dashboard/event'),
+    },
   ]
 
   const quickActions = [
     {
-      label: 'Rekayasa Lalu Lintas',
+      label:       'Rekayasa Lalu Lintas',
       description: 'Kelola penutupan jalan dan pengalihan rute',
-      path: '/admin/dashboard/traffic',
-      accent: 'bg-orange-600',
-      iconBg: 'bg-orange-100',
-      iconColor: 'text-orange-600',
+      path:        '/admin/dashboard/traffic',
+      accent:      'bg-orange-600',
+      iconBg:      'bg-orange-100',
+      iconColor:   'text-orange-600',
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -106,12 +123,13 @@ export default function AdminDashboard() {
       ),
     },
     {
-      label: 'Manajemen Event',
-      description: 'Tambah dan kelola agenda acara budaya',
-      path: '/admin/dashboard/event',
-      accent: 'bg-red-600',
-      iconBg: 'bg-red-100',
-      iconColor: 'text-red-600',
+      label:       'Manajemen Event',
+      description: 'Tambah, kelola event dan titik parkir',
+      // FIXED: path yang benar menuju AdminEvent
+      path:        '/admin/dashboard/event',
+      accent:      'bg-red-600',
+      iconBg:      'bg-red-100',
+      iconColor:   'text-red-600',
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -119,12 +137,12 @@ export default function AdminDashboard() {
       ),
     },
     {
-      label: 'Kelola Sejarah',
+      label:       'Kelola Sejarah',
       description: 'Edit konten sejarah Grebeg Suro',
-      path: '/admin/dashboard/sejarah',
-      accent: 'bg-blue-600',
-      iconBg: 'bg-blue-100',
-      iconColor: 'text-blue-600',
+      path:        '/admin/dashboard/sejarah',
+      accent:      'bg-blue-600',
+      iconBg:      'bg-blue-100',
+      iconColor:   'text-blue-600',
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -132,12 +150,12 @@ export default function AdminDashboard() {
       ),
     },
     {
-      label: 'Kelola Tentang',
+      label:       'Kelola Tentang',
       description: 'Edit informasi tentang Rute Suro',
-      path: '/admin/dashboard/tentang',
-      accent: 'bg-green-600',
-      iconBg: 'bg-green-100',
-      iconColor: 'text-green-600',
+      path:        '/admin/dashboard/tentang',
+      accent:      'bg-green-600',
+      iconBg:      'bg-green-100',
+      iconColor:   'text-green-600',
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -164,7 +182,7 @@ export default function AdminDashboard() {
 
       {/* Stat Cards */}
       <div
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 fade-up"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 fade-up"
         style={{ animationDelay: '0.08s' }}
       >
         {statCards.map((card) => (

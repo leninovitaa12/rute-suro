@@ -1,13 +1,9 @@
-// src/components/HeroSection.jsx
-// ✅ Mobile: swipe gesture only (no arrows) | Hapus badge "Kabupaten Ponorogo"
-
 import { Link } from 'react-router-dom'
 import { useState, useEffect, useRef, useCallback } from 'react'
 
 const FLIP_WORDS = ['Budaya', 'Wisata', 'Tradisi', 'Warisan']
 
-// ─── CAROUSEL SLIDES ─────────────────────────────────────────────────────────
-// Ganti src dengan path gambar Anda di folder public/images/
+// ─── CAROUSEL SLIDES 
 const SLIDES = [
   { src: '/images/grebeg-suro-1.jpg' },
   { src: '/images/grebeg-suro-2.jpg' },
@@ -362,7 +358,7 @@ export default function HeroSection() {
           <div className="hero-buttons" style={{
             display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '32px',
           }}>
-            <Link to="/map" className="btn-solid">Mulai Optimasi</Link>
+            <Link to="/map" className="btn-solid">Lihat Map</Link>
             <Link to="/jadwal" className="btn-ghost">Lihat Jadwal</Link>
           </div>
 

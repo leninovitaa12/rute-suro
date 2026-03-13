@@ -33,7 +33,7 @@ export default function App() {
         <AdminLayout>
           {(!section || section === '') && <AdminDashboard />}
           {section === 'traffic' && <AdminTraffic />}
-          {section === 'events' && <AdminEvent />}
+          {section === 'event' && <AdminEvent />}
           {section === 'sejarah' && <AdminSejarah />}
           {section === 'tentang' && <AdminTentang />}
         </AdminLayout>

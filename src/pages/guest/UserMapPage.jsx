@@ -35,7 +35,73 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
 })
 
-// ─── SVG Icons ────────────────────────────────────────────────────────────────
+// ─── Helper: buat DivIcon SVG custom ─────────────────────────────────────────
+function makeParkingIcon(isSelected = false) {
+  const bg     = isSelected ? '#f59e0b' : '#1d4ed8'
+  const border = isSelected ? '#92400e' : '#1e3a8a'
+  const size   = isSelected ? 38 : 32
+  const html = `
+    <div style="
+      width:${size}px;height:${size}px;
+      background:${bg};
+      border:2.5px solid ${border};
+      border-radius:8px 8px 8px 0;
+      transform:rotate(-45deg) translate(-4px,-4px);
+      box-shadow:0 2px 6px rgba(0,0,0,0.35);
+      display:flex;align-items:center;justify-content:center;
+    ">
+      <span style="
+        transform:rotate(45deg);
+        color:white;
+        font-weight:900;
+        font-size:${isSelected ? 16 : 14}px;
+        font-family:system-ui,sans-serif;
+        line-height:1;
+        text-shadow:0 1px 2px rgba(0,0,0,0.3);
+      ">P</span>
+    </div>`
+  return L.divIcon({
+    html,
+    className: '',
+    iconSize:    [size, size],
+    iconAnchor:  [size / 2, size],
+    popupAnchor: [0, -(size + 4)],
+  })
+}
+
+function makeEventPreviewIcon() {
+  const html = `
+    <div style="
+      width:32px;height:32px;
+      background:rgba(107,114,128,0.55);
+      border:2.5px solid rgba(75,85,99,0.8);
+      border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg) translate(-4px,-4px);
+      box-shadow:0 2px 6px rgba(0,0,0,0.25);
+      display:flex;align-items:center;justify-content:center;
+    ">
+      <span style="transform:rotate(45deg);color:white;font-size:14px;line-height:1;">📍</span>
+    </div>`
+  return L.divIcon({ html, className: '', iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -36] })
+}
+
+function makeEventSelectedIcon() {
+  const html = `
+    <div style="
+      width:40px;height:40px;
+      background:#dc2626;
+      border:3px solid #7f1d1d;
+      border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg) translate(-5px,-5px);
+      box-shadow:0 3px 10px rgba(220,38,38,0.5);
+      display:flex;align-items:center;justify-content:center;
+    ">
+      <span style="transform:rotate(45deg);color:white;font-size:18px;line-height:1;">🎯</span>
+    </div>`
+  return L.divIcon({ html, className: '', iconSize: [40, 40], iconAnchor: [20, 40], popupAnchor: [0, -44] })
+}
+
+// ─── SVG Icons (sama persis dengan aslinya) ───────────────────────────────────
 
 function IconLocationPin({ className = 'w-4 h-4' }) {
   return (
@@ -229,14 +295,6 @@ function IconClock({ className = 'w-4 h-4' }) {
   )
 }
 
-function IconHeart({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 function IconArrowSwap({ className = 'w-4 h-4' }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
@@ -340,7 +398,7 @@ function fmtDistShort(m) {
   return km < 10 ? `${km.toFixed(2)} km` : `${km.toFixed(1)} km`
 }
 
-// ─── Map overlays ─────────────────────────────────────────────────────────────
+// ─── Map overlays (sama persis) ───────────────────────────────────────────────
 
 function MapBadge({ tracking, followMe, voiceOn }) {
   return (
@@ -526,7 +584,6 @@ async function fetchWithTimeout(url, { timeoutMs = 8000, signal, headers } = {})
   }
 }
 
-// ─── Divider with label ───────────────────────────────────────────────────────
 function SectionDivider({ label }) {
   return (
     <div className="flex items-center gap-2 my-3">
@@ -537,7 +594,6 @@ function SectionDivider({ label }) {
   )
 }
 
-// ─── Input row with icon ──────────────────────────────────────────────────────
 function LocationRow({ icon: Icon, label, value, placeholder, active, onClick }) {
   return (
     <div
@@ -566,6 +622,7 @@ function LocationRow({ icon: Icon, label, value, placeholder, active, onClick })
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function UserMapPage() {
+  // ── State yang sudah ada (tidak berubah) ────────────────────────────────────
   const [events, setEvents] = React.useState([])
   const [closures, setClosures] = React.useState([])
   const [selectedEventId, setSelectedEventId] = React.useState('')
@@ -614,6 +671,18 @@ export default function UserMapPage() {
 
   const isMobile = typeof window !== 'undefined' ? window.innerWidth < 1024 : false
 
+  // ── State BARU: parkir ──────────────────────────────────────────────────────
+  const [parkingSpots, setParkingSpots] = React.useState([])
+  // Dropdown parkir muncul setelah event dipilih; value = spot.id
+  const [selectedParkingId, setSelectedParkingId] = React.useState('')
+  // Spots yang difilter sesuai event yang dipilih
+  const spotsForSelectedEvent = React.useMemo(
+    () => parkingSpots.filter(s => String(s.event_id) === String(selectedEventId)),
+    [parkingSpots, selectedEventId]
+  )
+  // 'event' = user klik "Tuju Lokasi Event", 'parking' = user klik "Tuju Titik Parkir", null = belum
+  const [destinationType, setDestinationType] = React.useState(null)
+
   React.useEffect(() => {
     if (isMobile) setRightPanelOpen(true)
   }, [isMobile])
@@ -655,6 +724,7 @@ export default function UserMapPage() {
     }
   }
 
+  // ── Bootstrap: muat events, closures, DAN parking_spots sekaligus ──────────
   React.useEffect(() => {
     let alive = true
     ;(async () => {
@@ -667,6 +737,8 @@ export default function UserMapPage() {
         const cl = Array.isArray(data.closures_active) ? data.closures_active : []
         setClosures(cl)
         closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
+        // ── BARU: parking_spots ──────────────────────────────────────────────
+        setParkingSpots(Array.isArray(data.parking_spots) ? data.parking_spots : [])
       } catch (e) {
         if (!alive) return
         setMsg('Gagal memuat data peta: ' + (e?.response?.data?.error || e.message))
@@ -683,11 +755,26 @@ export default function UserMapPage() {
     else { setEnd(latlng); setMsg('TUJUAN tersimpan. Tekan "Cari Rute".'); fillAddressFor('end', latlng) }
   }
 
+  // ── applyEventAsDestination: set ke lokasi event ────────────────────────────
   function applyEventAsDestination() {
     const ev = events.find((e) => e.id === selectedEventId)
     if (!ev) return
     const pt = { lat: ev.lat, lng: ev.lng }
-    setEnd(pt); setMsg(`Tujuan di-set ke event: ${ev.name}. Tekan "Cari Rute".`); fillAddressFor('end', pt)
+    setEnd(pt)
+    setDestinationType('event')
+    setMsg(`Tujuan di-set ke event: ${ev.name}. Tekan "Cari Rute".`)
+    fillAddressFor('end', pt)
+  }
+
+  // ── applyParkingAsDestination ────────────────────────────────────────────────
+  function applyParkingAsDestination() {
+    const spot = spotsForSelectedEvent.find(s => String(s.id) === String(selectedParkingId))
+    if (!spot) return
+    const pt = { lat: spot.lat, lng: spot.lng }
+    setEnd(pt)
+    setDestinationType('parking')
+    setMsg(`Tujuan di-set ke parkir: ${spot.name}. Tekan "Cari Rute".`)
+    fillAddressFor('end', pt)
   }
 
   async function refreshClosures({ force = false, silent = true } = {}) {
@@ -896,7 +983,7 @@ export default function UserMapPage() {
             <p className="text-xs font-semibold text-[#2B3440] leading-relaxed">{msg}</p>
           </div>
 
-          {/* ── Location inputs ── */}
+          {/* ── Location inputs (tidak berubah) ── */}
           <div className="mb-1">
             <div className="relative flex flex-col gap-1.5">
               <LocationRow
@@ -907,7 +994,6 @@ export default function UserMapPage() {
                 active={pickMode === 'start' && !tracking}
                 onClick={() => { if (!tracking) { setPickMode('start'); setMsg('Mode: pilih START. Klik peta.') } }}
               />
-              {/* Swap indicator between rows */}
               <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[#DDD8D0] bg-white shadow-sm text-[#6B6560]">
                   <IconArrowSwap className="w-3.5 h-3.5" />
@@ -924,7 +1010,7 @@ export default function UserMapPage() {
             </div>
           </div>
 
-          {/* Use my location button */}
+          {/* Use my location button (tidak berubah) */}
           <button
             onClick={useMyLocationAsStart}
             className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-[#DDD8D0] bg-white hover:bg-[#F4F2EF] text-[#2B3440] font-bold text-sm transition hover:border-[#8b1a1a]/40"
@@ -933,20 +1019,32 @@ export default function UserMapPage() {
             Pakai Lokasi Saya sebagai START
           </button>
 
-          <SectionDivider label="Event" />
+          {/* ══════════════════════════════════════════════════════════════
+              SECTION BARU: Event + Parkir sebagai Tujuan
+              ══════════════════════════════════════════════════════════════ */}
+          <SectionDivider label="Tujuan Event" />
 
-          {/* ── Event picker ── */}
           <div className="mb-1">
             <div className="flex items-center gap-2 mb-2">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#8b1a1a] text-white">
                 <IconCalendar className="w-3.5 h-3.5" />
               </span>
-              <p className="text-xs font-extrabold tracking-[0.08em] text-[#2B3440] uppercase">Pilih Event (Opsional)</p>
+              <p className="text-xs font-extrabold tracking-[0.08em] text-[#2B3440] uppercase">
+                Pilih Event &amp; Tujuan
+              </p>
             </div>
 
+            {/* Step 1: Pilih event */}
+            <p className="text-[10px] font-bold text-[#6B6560] uppercase tracking-wide mb-1">
+              1. Pilih Event
+            </p>
             <select
               value={selectedEventId}
-              onChange={(e) => setSelectedEventId(e.target.value)}
+              onChange={(e) => {
+                setSelectedEventId(e.target.value)
+                setSelectedParkingId('') // reset pilihan parkir saat event berubah
+                setDestinationType(null) // reset tipe tujuan
+              }}
               className="w-full px-3 py-2.5 border border-[#DDD8D0] rounded-xl text-[#2B3440] font-semibold text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#8b1a1a]/30 focus:border-[#8b1a1a] transition"
             >
               <option value="">-- pilih event --</option>
@@ -957,23 +1055,84 @@ export default function UserMapPage() {
               ))}
             </select>
 
-            <button
-              onClick={applyEventAsDestination}
-              disabled={!selectedEventId}
-              className={`w-full mt-2 flex items-center justify-center gap-2 px-3 py-2.5 font-bold rounded-xl text-sm border transition ${
-                selectedEventId
-                  ? 'bg-[#8b1a1a] hover:bg-[#6b1414] text-white border-[#8b1a1a]'
-                  : 'bg-[#F4F2EF] text-[#A09890] border-[#DDD8D0] cursor-not-allowed'
-              }`}
-            >
-              <IconMapPin className="w-4 h-4" />
-              Jadikan Event sebagai Tujuan
-            </button>
+            {/* Tombol: langsung ke lokasi event */}
+            {selectedEventId && (
+              <button
+                onClick={applyEventAsDestination}
+                className={`w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 font-bold rounded-xl text-sm border transition ${
+                  destinationType === 'event'
+                    ? 'bg-[#6b1414] text-white border-[#6b1414] ring-2 ring-[#8b1a1a]/40'
+                    : 'bg-[#8b1a1a] hover:bg-[#6b1414] text-white border-[#8b1a1a]'
+                }`}
+              >
+                <IconMapPin className="w-3.5 h-3.5" />
+                {destinationType === 'event' ? '🎯 Lokasi Event Dipilih' : 'Tuju Lokasi Event'}
+              </button>
+            )}
+
+            {/* Step 2: Pilih parkir (hanya muncul jika event dipilih) */}
+            {selectedEventId && (
+              <div className="mt-3">
+                {/* Garis tipis pemisah */}
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="flex-1 h-px bg-[#DDD8D0]" />
+                  <span className="text-[10px] font-bold text-[#6B6560] uppercase tracking-wide">atau ke parkir</span>
+                  <div className="flex-1 h-px bg-[#DDD8D0]" />
+                </div>
+
+                <p className="text-[10px] font-bold text-[#6B6560] uppercase tracking-wide mb-1">
+                  2. Pilih Titik Parkir
+                </p>
+
+                {spotsForSelectedEvent.length === 0 ? (
+                  <div className="px-3 py-2.5 rounded-xl border border-dashed border-[#DDD8D0] bg-[#F4F2EF] text-center">
+                    <p className="text-xs text-[#A09890] font-semibold">
+                      🅿️ Belum ada titik parkir untuk event ini
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      value={selectedParkingId}
+                      onChange={(e) => setSelectedParkingId(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-[#DDD8D0] rounded-xl text-[#2B3440] font-semibold text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400/30 focus:border-blue-500 transition"
+                    >
+                      <option value="">-- pilih titik parkir --</option>
+                      {spotsForSelectedEvent.map((spot) => (
+                        <option key={spot.id} value={spot.id}>
+                          🅿️ {spot.name}
+                          {spot.capacity ? ` (${spot.capacity} kend.)` : ''}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      onClick={applyParkingAsDestination}
+                      disabled={!selectedParkingId}
+                      className={`w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 font-bold rounded-xl text-sm border transition ${
+                        !selectedParkingId
+                          ? 'bg-[#F4F2EF] text-[#A09890] border-[#DDD8D0] cursor-not-allowed'
+                          : destinationType === 'parking'
+                            ? 'bg-blue-900 text-white border-blue-900 ring-2 ring-blue-400/40'
+                            : 'bg-blue-700 hover:bg-blue-800 text-white border-blue-700'
+                      }`}
+                    >
+                      <IconMapPin className="w-3.5 h-3.5" />
+                      {destinationType === 'parking' && selectedParkingId
+                        ? `⭐ ${spotsForSelectedEvent.find(s => String(s.id) === String(selectedParkingId))?.name ?? 'Parkir Dipilih'}`
+                        : 'Tuju Titik Parkir'
+                      }
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
+          {/* ═══════════════════════════════════════════════════════════════ */}
 
           <SectionDivider label="Navigasi" />
 
-          {/* ── Turn by turn (hanya tampil saat tracking aktif) ── */}
+          {/* ── Turn by turn (tidak berubah) ── */}
           {tracking && (activeStep || currentStreet) && (
             <div className="mb-3">
               {currentStreet && (
@@ -1013,7 +1172,7 @@ export default function UserMapPage() {
             </div>
           )}
 
-          {/* ── 1. CARI RUTE ── */}
+          {/* ── Cari Rute (tidak berubah) ── */}
           <button
             onClick={() => findRoute()}
             disabled={loadingRoute || !canFindRoute}
@@ -1029,7 +1188,7 @@ export default function UserMapPage() {
             }
           </button>
 
-          {/* ── 2. MULAI / STOP NAVIGASI (tombol utama penuh) ── */}
+          {/* ── Mulai / Stop Navigasi (tidak berubah) ── */}
           <button
             onClick={() => tracking ? stopTracking() : startTracking()}
             disabled={!activeRoute && !tracking}
@@ -1047,7 +1206,7 @@ export default function UserMapPage() {
             }
           </button>
 
-          {/* ── 3. Kontrol sekunder: Ikuti + Suara + Ulangi ── */}
+          {/* ── Kontrol sekunder (tidak berubah) ── */}
           <div className="grid grid-cols-3 gap-2 mb-3">
             <button
               onClick={() => setFollowMe((v) => !v)}
@@ -1087,7 +1246,7 @@ export default function UserMapPage() {
             </button>
           </div>
 
-          {/* ── 4. Alternatif rute (muncul setelah rute ditemukan) ── */}
+          {/* ── Alternatif rute (tidak berubah) ── */}
           {hasRoutes && (
             <div className="mb-3">
               <div className="flex items-center justify-between mb-2">
@@ -1158,7 +1317,7 @@ export default function UserMapPage() {
             </div>
           )}
 
-          {/* ── Geo error ── */}
+          {/* ── Geo error (tidak berubah) ── */}
           {geoErr && (
             <div className="flex items-start gap-2 text-xs text-[#8b1a1a] font-semibold bg-[#FEF5F5] border border-[#8b1a1a]/30 rounded-xl p-3 mb-3">
               <IconAlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-[#8b1a1a]" />
@@ -1166,7 +1325,7 @@ export default function UserMapPage() {
             </div>
           )}
 
-          {/* ── Road info / closures ── */}
+          {/* ── Road info (tidak berubah) ── */}
           <div className="rounded-2xl border border-[#DDD8D0] bg-[#F4F2EF] p-3">
             <div className="flex items-center gap-2 mb-1.5">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#8b1a1a] text-white">
@@ -1178,6 +1337,30 @@ export default function UserMapPage() {
               <span className="inline-flex items-center gap-1.5">
                 <span className="inline-block w-3 h-1.5 bg-red-600 rounded-sm" />
                 <span>Jalan ditutup (rekayasa lalu lintas)</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-[#2B3440] font-semibold ml-9 mt-1">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex w-5 h-5 items-center justify-center rounded-md bg-blue-700 text-white text-[9px] font-black">P</span>
+                <span>Titik parkir (biru = tersedia)</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-[#2B3440] font-semibold ml-9 mt-1">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex w-5 h-5 items-center justify-center rounded-md bg-amber-400 text-white text-[9px] font-black">P</span>
+                <span>Parkir dipilih sebagai tujuan</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-[#2B3440] font-semibold ml-9 mt-1">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block w-3 h-3 rounded-full bg-gray-400/60 border border-gray-500" />
+                <span>Lokasi event (preview)</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-[#2B3440] font-semibold ml-9 mt-1">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block w-3 h-3 rounded-full bg-red-600" />
+                <span>Tujuan event dipilih</span>
               </span>
             </div>
             {loadingClosures && (
@@ -1216,6 +1399,89 @@ export default function UserMapPage() {
           {start && <Marker position={[start.lat, start.lng]}><Popup>Start</Popup></Marker>}
           {end && <Marker position={[end.lat, end.lng]}><Popup>Tujuan</Popup></Marker>}
 
+          {/* ── Marker lokasi event:
+               - Preview (abu transparan) = event dipilih tapi belum klik "Tuju Lokasi Event"
+               - Selected (merah 🎯)     = setelah klik "Tuju Lokasi Event"              ── */}
+          {selectedEventId && (() => {
+            const ev = events.find(e => String(e.id) === String(selectedEventId))
+            if (!ev?.lat || !ev?.lng) return null
+            const isEventDest = destinationType === 'event'
+            return (
+              <Marker
+                key={`event_marker_${ev.id}`}
+                position={[ev.lat, ev.lng]}
+                icon={isEventDest ? makeEventSelectedIcon() : makeEventPreviewIcon()}
+                zIndexOffset={isEventDest ? 900 : 100}
+              >
+                <Popup>
+                  <div style={{ minWidth: '160px' }}>
+                    <p style={{ fontWeight: 'bold', marginBottom: '4px', color: isEventDest ? '#dc2626' : '#374151' }}>
+                      {isEventDest ? '🎯 ' : '📍 '}{ev.name}
+                    </p>
+                    {ev.location && <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>{ev.location}</p>}
+                    {!isEventDest && (
+                      <button
+                        style={{ padding: '5px 10px', background: '#8b1a1a', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px', width: '100%' }}
+                        onClick={applyEventAsDestination}
+                      >
+                        Jadikan Tujuan
+                      </button>
+                    )}
+                    {isEventDest && (
+                      <p style={{ fontSize: '11px', color: '#dc2626', fontWeight: '700' }}>✓ Dipilih sebagai tujuan</p>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          })()}
+
+          {/* ── Marker titik parkir: ikon "P" biru (biasa) / gold (dipilih) ── */}
+          {selectedEventId && spotsForSelectedEvent.map((spot) => {
+            const isSelected = destinationType === 'parking' && String(spot.id) === String(selectedParkingId)
+            return (
+              <Marker
+                key={`parking_${spot.id}`}
+                position={[spot.lat, spot.lng]}
+                icon={makeParkingIcon(isSelected)}
+                zIndexOffset={isSelected ? 1000 : 0}
+              >
+                <Popup>
+                  <div style={{ minWidth: '160px' }}>
+                    <p style={{ fontWeight: 'bold', marginBottom: '4px', color: isSelected ? '#d97706' : '#1d4ed8' }}>
+                      {isSelected ? '⭐ ' : '🅿️ '}{spot.name}{isSelected ? ' (Tujuan)' : ''}
+                    </p>
+                    {spot.description && <p style={{ fontSize: '12px', color: '#555', marginBottom: '2px' }}>{spot.description}</p>}
+                    {spot.capacity != null && (
+                      <p style={{ fontSize: '12px', color: '#1d4ed8', fontWeight: '600', marginBottom: '6px' }}>
+                        Kapasitas: {spot.capacity} kendaraan
+                      </p>
+                    )}
+                    <button
+                      style={{
+                        padding: '5px 10px',
+                        background: isSelected ? '#d97706' : '#1d4ed8',
+                        color: 'white', border: 'none', borderRadius: '6px',
+                        fontWeight: 'bold', cursor: 'pointer', fontSize: '12px', width: '100%'
+                      }}
+                      onClick={() => {
+                        const pt = { lat: spot.lat, lng: spot.lng }
+                        setEnd(pt)
+                        setSelectedParkingId(String(spot.id))
+                        setDestinationType('parking')
+                        setMsg(`Tujuan di-set ke parkir: ${spot.name}. Tekan "Cari Rute".`)
+                        fillAddressFor('end', pt)
+                      }}
+                    >
+                      {isSelected ? '✓ Tujuan Aktif' : 'Jadikan Tujuan'}
+                    </button>
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          })}
+
+          {/* Closures (tidak berubah) */}
           {closures.map((c) => {
             const edgeList = Array.isArray(c.edges) ? c.edges : []
             const multi = edgeList
@@ -1246,7 +1512,11 @@ export default function UserMapPage() {
           {routes.fastest?.polyline && (
             <Polyline
               positions={routes.fastest.polyline.map((p) => [p.lat, p.lng])}
-              pathOptions={{ color: '#1d4ed8', weight: selectedMode === 'fastest' ? 7 : 4, opacity: selectedMode === 'fastest' ? 1 : 0.35 }}
+              pathOptions={{
+                color:   selectedMode === 'fastest' ? '#1d4ed8' : '#6b7280',
+                weight:  selectedMode === 'fastest' ? 7 : 4,
+                opacity: selectedMode === 'fastest' ? 1 : 0.4,
+              }}
             >
               <Tooltip sticky>Tercepat • {fmtMin(routes.fastest?.total_time_sec)} • {fmtKm(routes.fastest?.total_length_m)}</Tooltip>
             </Polyline>
@@ -1255,7 +1525,12 @@ export default function UserMapPage() {
           {routes.shortest?.polyline && (
             <Polyline
               positions={routes.shortest.polyline.map((p) => [p.lat, p.lng])}
-              pathOptions={{ color: '#7c3aed', weight: selectedMode === 'shortest' ? 7 : 4, opacity: selectedMode === 'shortest' ? 1 : 0.35, dashArray: selectedMode === 'shortest' ? undefined : '6 10' }}
+              pathOptions={{
+                color:     selectedMode === 'shortest' ? '#38bdf8' : '#6b7280',
+                weight:    selectedMode === 'shortest' ? 7 : 4,
+                opacity:   selectedMode === 'shortest' ? 1 : 0.4,
+                dashArray: selectedMode === 'shortest' ? undefined : '8 10',
+              }}
             >
               <Tooltip sticky>Terpendek • {fmtMin(routes.shortest?.total_time_sec)} • {fmtKm(routes.shortest?.total_length_m)}</Tooltip>
             </Polyline>
