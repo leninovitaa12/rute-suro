@@ -1,703 +1,152 @@
 import React from 'react'
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  Polyline,
-  useMapEvents,
-  CircleMarker,
-  Tooltip
-} from 'react-leaflet'
-import L from 'leaflet'
+import { MapContainer, TileLayer } from 'react-leaflet'
 import dayjs from 'dayjs'
 import { api } from '../../lib/api.js'
 import RightDockPanel from '../../components/RightDockPanel.jsx'
 
-const DEFAULT_CENTER = [-7.871, 111.462]
+// ── Map sub-components ────────────────────────────────────────────────────────
+import MapLayers, { ClickSetter } from '../../components/map/MapLayers.jsx'
+import {
+  MapBadge,
+  InstructionOverlay,
+  RouteSummaryBar,
+  LaneSim,
+  SectionDivider,
+  LocationRow,
+  fmtMin,
+  fmtKm,
+  haversineM,
+  bearingDeg,
+  distanceToPolylineM,
+  speak,
+  fetchWithTimeout,
+} from '../../components/map/MapOverlays.jsx'
+import {
+  IconLocationPin,
+  IconFlag,
+  IconMyLocation,
+  IconNavigation,
+  IconVolume,
+  IconVolumeMute,
+  IconFollow,
+  IconRepeat,
+  IconSearch,
+  IconRoute,
+  IconZap,
+  IconMinimize,
+  IconAlertTriangle,
+  IconCalendar,
+  IconMapPin,
+  IconInfo,
+  IconStop,
+  IconArrowTurnLeft,
+  IconArrowTurnRight,
+  IconArrowUp,
+  IconArrowSwap,
+} from '../../components/map/MapSvgIcons.jsx'
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const DEFAULT_CENTER        = [-7.871, 111.462]
 const OFF_ROUTE_TOLERANCE_M = 35
-const NAVBAR_H_PX = 80
-const CLOSURES_TTL_MS = 30 * 1000
-
-const STEP_TRIGGER_M = 25
-const STREET_FETCH_MIN_MS = 3000
-
-const FOLLOW_ZOOM = 18
-const FOLLOW_FLY_DURATION = 0.65
-
-const REVERSE_GEO_TTL_MS = 24 * 60 * 60 * 1000
+const NAVBAR_H_PX           = 80
+const CLOSURES_TTL_MS       = 30 * 1000
+const STEP_TRIGGER_M        = 25
+const STREET_FETCH_MIN_MS   = 3000
+const FOLLOW_ZOOM           = 18
+const FOLLOW_FLY_DURATION   = 0.65
+const REVERSE_GEO_TTL_MS    = 24 * 60 * 60 * 1000
 const REVERSE_GEO_TIMEOUT_MS = 9000
 
-delete L.Icon.Default.prototype._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
-})
-
-// ─── Helper: buat DivIcon SVG custom ─────────────────────────────────────────
-function makeParkingIcon(isSelected = false) {
-  const bg     = isSelected ? '#f59e0b' : '#1d4ed8'
-  const border = isSelected ? '#92400e' : '#1e3a8a'
-  const size   = isSelected ? 38 : 32
-  const html = `
-    <div style="
-      width:${size}px;height:${size}px;
-      background:${bg};
-      border:2.5px solid ${border};
-      border-radius:8px 8px 8px 0;
-      transform:rotate(-45deg) translate(-4px,-4px);
-      box-shadow:0 2px 6px rgba(0,0,0,0.35);
-      display:flex;align-items:center;justify-content:center;
-    ">
-      <span style="
-        transform:rotate(45deg);
-        color:white;
-        font-weight:900;
-        font-size:${isSelected ? 16 : 14}px;
-        font-family:system-ui,sans-serif;
-        line-height:1;
-        text-shadow:0 1px 2px rgba(0,0,0,0.3);
-      ">P</span>
-    </div>`
-  return L.divIcon({
-    html,
-    className: '',
-    iconSize:    [size, size],
-    iconAnchor:  [size / 2, size],
-    popupAnchor: [0, -(size + 4)],
-  })
-}
-
-function makeEventPreviewIcon() {
-  const html = `
-    <div style="
-      width:32px;height:32px;
-      background:rgba(107,114,128,0.55);
-      border:2.5px solid rgba(75,85,99,0.8);
-      border-radius:50% 50% 50% 0;
-      transform:rotate(-45deg) translate(-4px,-4px);
-      box-shadow:0 2px 6px rgba(0,0,0,0.25);
-      display:flex;align-items:center;justify-content:center;
-    ">
-      <span style="transform:rotate(45deg);color:white;font-size:14px;line-height:1;">📍</span>
-    </div>`
-  return L.divIcon({ html, className: '', iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -36] })
-}
-
-function makeEventSelectedIcon() {
-  const html = `
-    <div style="
-      width:40px;height:40px;
-      background:#dc2626;
-      border:3px solid #7f1d1d;
-      border-radius:50% 50% 50% 0;
-      transform:rotate(-45deg) translate(-5px,-5px);
-      box-shadow:0 3px 10px rgba(220,38,38,0.5);
-      display:flex;align-items:center;justify-content:center;
-    ">
-      <span style="transform:rotate(45deg);color:white;font-size:18px;line-height:1;">🎯</span>
-    </div>`
-  return L.divIcon({ html, className: '', iconSize: [40, 40], iconAnchor: [20, 40], popupAnchor: [0, -44] })
-}
-
-// ─── SVG Icons (sama persis dengan aslinya) ───────────────────────────────────
-
-function IconLocationPin({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="12" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  )
-}
-
-function IconFlag({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconMyLocation({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.4" strokeDasharray="2 3" />
-    </svg>
-  )
-}
-
-function IconNavigation({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M3 11l19-9-9 19-2-8-8-2z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function IconVolume({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconVolumeMute({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <line x1="23" y1="9" x2="17" y2="15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <line x1="17" y1="9" x2="23" y2="15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconFollow({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="12" cy="12" r="3" fill="currentColor" />
-      <path d="M12 3v2M12 19v2M3 12h2M19 12h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconRepeat({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M17 1l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M3 11V9a4 4 0 014-4h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M7 23l-4-4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M21 13v2a4 4 0 01-4 4H3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconSearch({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconRoute({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <circle cx="5" cy="6" r="2.5" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="19" cy="18" r="2.5" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M5 8.5v2a5 5 0 005 5h4a5 5 0 015 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconZap({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function IconMinimize({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconAlertTriangle({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconCalendar({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconMapPin({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  )
-}
-
-function IconInfo({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M12 16v-4M12 8h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconStop({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  )
-}
-
-function IconArrowTurnLeft({ className = 'w-5 h-5' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M9 14L4 9l5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M4 9h10a6 6 0 016 6v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconArrowTurnRight({ className = 'w-5 h-5' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M15 14l5-5-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M20 9H10a6 6 0 00-6 6v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconArrowUp({ className = 'w-5 h-5' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M12 19V5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M5 12l7-7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function IconClock({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconArrowSwap({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M7 16V4m0 0L3 8m4-4l4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M17 8v12m0 0l4-4m-4 4l-4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function IconRecenter({ className = 'w-4 h-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-// ─── Map helpers ──────────────────────────────────────────────────────────────
-
-function ClickSetter({ mode, onPick }) {
-  useMapEvents({
-    click(e) {
-      onPick({ lat: e.latlng.lat, lng: e.latlng.lng }, mode)
-    }
-  })
-  return null
-}
-
-function pointToSegmentDistanceM(p, a, b) {
-  const toXY = (ll) => {
-    const x = ll.lng * 111320 * Math.cos((p.lat * Math.PI) / 180)
-    const y = ll.lat * 110540
-    return { x, y }
-  }
-  const P = toXY(p), A = toXY(a), B = toXY(b)
-  const ABx = B.x - A.x, ABy = B.y - A.y
-  const APx = P.x - A.x, APy = P.y - A.y
-  const ab2 = ABx * ABx + ABy * ABy
-  let t = ab2 === 0 ? 0 : (APx * ABx + APy * ABy) / ab2
-  t = Math.max(0, Math.min(1, t))
-  const Cx = A.x + t * ABx, Cy = A.y + t * ABy
-  const dx = P.x - Cx, dy = P.y - Cy
-  return Math.sqrt(dx * dx + dy * dy)
-}
-
-function distanceToPolylineM(point, polyline) {
-  if (!point || !Array.isArray(polyline) || polyline.length < 2) return Infinity
-  let best = Infinity
-  for (let i = 0; i < polyline.length - 1; i++) {
-    const d = pointToSegmentDistanceM(point, polyline[i], polyline[i + 1])
-    if (d < best) best = d
-  }
-  return best
-}
-
-function haversineM(a, b) {
-  if (!a || !b) return Infinity
-  const R = 6371000
-  const toRad = (x) => (x * Math.PI) / 180
-  const dLat = toRad(b.lat - a.lat)
-  const dLng = toRad(b.lng - a.lng)
-  const lat1 = toRad(a.lat), lat2 = toRad(b.lat)
-  const x = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
-  return 2 * R * Math.asin(Math.sqrt(x))
-}
-
-function bearingDeg(a, b) {
-  if (!a || !b) return 0
-  const toRad = (x) => (x * Math.PI) / 180
-  const toDeg = (x) => (x * 180) / Math.PI
-  const lat1 = toRad(a.lat), lat2 = toRad(b.lat)
-  const dLon = toRad(b.lng - a.lng)
-  const y = Math.sin(dLon) * Math.cos(lat2)
-  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
-  return (toDeg(Math.atan2(y, x)) + 360) % 360
-}
-
-function fmtMin(sec) {
-  if (sec == null || Number.isNaN(Number(sec))) return '?'
-  const mins = Number(sec) / 60
-  return mins < 10 ? `${mins.toFixed(1)} menit` : `${mins.toFixed(0)} menit`
-}
-function fmtKm(m) {
-  if (m == null || Number.isNaN(Number(m))) return '?'
-  const km = Number(m) / 1000
-  return km < 10 ? `${km.toFixed(2)} km` : `${km.toFixed(1)} km`
-}
-function fmtMinShort(sec) {
-  if (sec == null || !Number.isFinite(Number(sec))) return '?'
-  const mins = Number(sec) / 60
-  if (mins < 1) return '<1'
-  if (mins < 10) return mins.toFixed(1)
-  return mins.toFixed(0)
-}
-function fmtDistShort(m) {
-  if (m == null || !Number.isFinite(Number(m))) return '?'
-  const mm = Number(m)
-  if (mm < 1000) return `${Math.max(1, Math.round(mm))} m`
-  const km = mm / 1000
-  return km < 10 ? `${km.toFixed(2)} km` : `${km.toFixed(1)} km`
-}
-
-// ─── Map overlays (sama persis) ───────────────────────────────────────────────
-
-function MapBadge({ tracking, followMe, voiceOn }) {
-  return (
-    <div className="absolute top-3 left-3 z-[1000] pointer-events-none">
-      <div className="bg-white/80 backdrop-blur border border-gray-200 shadow-sm rounded-2xl px-3 py-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
-            tracking ? 'bg-emerald-50/80 text-emerald-800 border-emerald-200' : 'bg-gray-50/80 text-gray-700 border-gray-200'
-          }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${tracking ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-            {tracking ? 'NAVIGASI AKTIF' : 'NAVIGASI OFF'}
-          </span>
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
-            followMe ? 'bg-gray-900/90 text-white border-gray-900' : 'bg-white/70 text-gray-700 border-gray-200'
-          }`}>
-            <IconFollow className="w-3 h-3" />
-            {followMe ? 'ON' : 'OFF'}
-          </span>
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
-            voiceOn ? 'bg-indigo-50/80 text-indigo-800 border-indigo-200' : 'bg-white/70 text-gray-700 border-gray-200'
-          }`}>
-            {voiceOn ? <IconVolume className="w-3 h-3" /> : <IconVolumeMute className="w-3 h-3" />}
-            {voiceOn ? 'ON' : 'OFF'}
-          </span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function InstructionOverlay({ tracking, activeStep, distToNext }) {
-  if (!tracking || !activeStep) return null
-  const t = (activeStep.type || '').toLowerCase()
-  let DirectionIcon = IconArrowUp
-  if (t.includes('left')) DirectionIcon = IconArrowTurnLeft
-  else if (t.includes('right')) DirectionIcon = IconArrowTurnRight
-
-  return (
-    <div className="absolute top-3 right-3 left-3 sm:left-auto z-[1000] pointer-events-none">
-      <div className="bg-emerald-600/90 backdrop-blur border border-emerald-500 shadow-lg rounded-2xl px-4 py-3">
-        <div className="flex items-start gap-3">
-          <span className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white mt-0.5">
-            <DirectionIcon className="w-5 h-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider mb-0.5">Instruksi</p>
-            <p className="text-sm font-bold text-white leading-snug">{activeStep.instruction}</p>
-            {distToNext != null && (
-              <p className="mt-1 text-[11px] text-emerald-200 font-semibold">{distToNext} m lagi</p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function RouteSummaryBar({ activeRoute, selectedMode, tracking, myPos, end, onRecenter }) {
-  if (!activeRoute) return null
-
-  const totalSec = Number(activeRoute?.total_time_sec)
-  const totalLen = Number(activeRoute?.total_length_m)
-  let targetSec = totalSec, targetM = totalLen
-
-  if (tracking && myPos && end && Number.isFinite(totalSec) && Number.isFinite(totalLen) && totalSec > 0 && totalLen > 0) {
-    const remainM = haversineM(myPos, end)
-    const avgSpeedMps = totalLen / totalSec
-    targetSec = Math.max(0, remainM / Math.max(avgSpeedMps, 0.15))
-    targetM = remainM
-  }
-
-  const [dispSec, setDispSec] = React.useState(() => Number.isFinite(targetSec) ? targetSec : 0)
-  const [dispM, setDispM] = React.useState(() => Number.isFinite(targetM) ? targetM : 0)
-
-  React.useEffect(() => {
-    let raf = 0, alive = true
-    const lerp = (a, b, t) => a + (b - a) * t
-    const tick = () => {
-      if (!alive) return
-      setDispSec((prev) => lerp(Number.isFinite(prev) ? prev : 0, Number.isFinite(targetSec) ? targetSec : 0, 0.18))
-      setDispM((prev) => lerp(Number.isFinite(prev) ? prev : 0, Number.isFinite(targetM) ? targetM : 0, 0.18))
-      raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => { alive = false; if (raf) cancelAnimationFrame(raf) }
-  }, [targetSec, targetM])
-
-  const modeLabel = selectedMode === 'fastest' ? 'Tercepat' : 'Terpendek'
-
-  return (
-    <div className="absolute bottom-3 left-3 right-3 z-[1000] pointer-events-none">
-      <div className="route-summary-shell">
-        <div className="route-summary-main">
-          <div className="route-summary-time">
-            {fmtMinShort(dispSec)}
-            <span className="route-summary-unit"> min</span>
-          </div>
-          <div className="route-summary-meta">
-            <span className="route-summary-dist">{fmtDistShort(dispM)}</span>
-            <span className={`route-summary-chip ${selectedMode === 'fastest' ? 'chip-fast' : 'chip-short'}`}>
-              {modeLabel}
-            </span>
-          </div>
-        </div>
-        <button type="button" onClick={onRecenter} className="route-summary-btn pointer-events-auto" aria-label="Recenter">
-          <IconRecenter className="w-5 h-5" />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function LaneSim({ step }) {
-  if (!step) return null
-  const t = (step.type || '').toLowerCase()
-  let active = 'straight'
-  if (t.includes('left')) active = 'left'
-  else if (t.includes('right')) active = 'right'
-
-  const Lane = ({ kind, label }) => (
-    <div className={`flex-1 flex flex-col items-center justify-center border rounded-xl py-2 gap-1 ${
-      active === kind ? 'bg-[#8b1a1a] text-white border-[#8b1a1a]' : 'bg-white text-gray-600 border-gray-200'
-    }`}>
-      {kind === 'left' && <IconArrowTurnLeft className="w-4 h-4" />}
-      {kind === 'straight' && <IconArrowUp className="w-4 h-4" />}
-      {kind === 'right' && <IconArrowTurnRight className="w-4 h-4" />}
-      <div className="text-[10px] font-bold">{label}</div>
-      {active === kind && <div className="text-[9px] opacity-75">disarankan</div>}
-    </div>
-  )
-
-  return (
-    <div className="mt-3">
-      <p className="text-[11px] font-semibold text-emerald-900/70 mb-1.5">Simulasi lajur</p>
-      <div className="flex gap-1.5">
-        <Lane kind="left" label="Kiri" />
-        <Lane kind="straight" label="Lurus" />
-        <Lane kind="right" label="Kanan" />
-      </div>
-      <p className="mt-1 text-[10px] text-emerald-900/50">
-        *Simulasi berdasarkan manuver, bukan data lajur asli.
-      </p>
-    </div>
-  )
-}
-
-function makeArrowIcon(deg) {
-  const d = Number.isFinite(deg) ? deg : 0
-  return L.divIcon({
-    className: '',
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
-    html: `<div style="width:36px;height:36px;border-radius:18px;background:rgba(37,99,235,0.15);display:flex;align-items:center;justify-content:center;border:2px solid rgba(37,99,235,0.65);box-shadow:0 2px 8px rgba(0,0,0,0.15);">
-      <div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:16px solid rgba(37,99,235,0.95);transform:rotate(${d}deg);transform-origin:50% 70%;"></div>
-    </div>`
-  })
-}
-
-function speak(text, { rate = 1.0, pitch = 1.0, lang = 'id-ID' } = {}) {
-  try {
-    if (!('speechSynthesis' in window)) return
-    const u = new SpeechSynthesisUtterance(text)
-    u.lang = lang; u.rate = rate; u.pitch = pitch
-    window.speechSynthesis.cancel()
-    window.speechSynthesis.speak(u)
-  } catch { }
-}
-
-async function fetchWithTimeout(url, { timeoutMs = 8000, signal, headers } = {}) {
-  const ctrl = new AbortController()
-  const id = setTimeout(() => ctrl.abort(), timeoutMs)
-  const onAbort = () => ctrl.abort()
-  if (signal) {
-    if (signal.aborted) ctrl.abort()
-    signal.addEventListener('abort', onAbort, { once: true })
-  }
-  try {
-    const res = await fetch(url, { signal: ctrl.signal, headers })
-    return res
-  } finally {
-    clearTimeout(id)
-    if (signal) signal.removeEventListener('abort', onAbort)
-  }
-}
-
-function SectionDivider({ label }) {
-  return (
-    <div className="flex items-center gap-2 my-3">
-      <div className="flex-1 h-px bg-[#DDD8D0]" />
-      {label ? <span className="text-[10px] font-extrabold tracking-[0.12em] text-[#6B6560] uppercase">{label}</span> : null}
-      <div className="flex-1 h-px bg-[#DDD8D0]" />
-    </div>
-  )
-}
-
-function LocationRow({ icon: Icon, label, value, placeholder, active, onClick }) {
-  return (
-    <div
-      onClick={onClick}
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition cursor-pointer ${
-        active
-          ? 'border-[#8b1a1a] bg-[#FEF5F5] ring-1 ring-[#8b1a1a]/20'
-          : 'border-[#DDD8D0] bg-white hover:border-[#8b1a1a]/40 hover:bg-[#F4F2EF]'
-      }`}
-    >
-      <span className={`flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg ${
-        active ? 'bg-[#8b1a1a] text-white' : 'bg-[#F4F2EF] text-[#6B6560]'
-      }`}>
-        <Icon className="w-3.5 h-3.5" />
-      </span>
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-extrabold tracking-[0.08em] text-[#6B6560] uppercase">{label}</p>
-        <p className={`text-xs font-bold truncate leading-tight ${value ? 'text-[#2B3440]' : 'text-[#A09890]'}`}>
-          {value || placeholder}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
-
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function UserMapPage() {
-  // ── State yang sudah ada (tidak berubah) ────────────────────────────────────
-  const [events, setEvents] = React.useState([])
-  const [closures, setClosures] = React.useState([])
+
+  // ── Core state ───────────────────────────────────────────────────────────────
+  const [events,          setEvents]          = React.useState([])
+  const [closures,        setClosures]        = React.useState([])
   const [selectedEventId, setSelectedEventId] = React.useState('')
 
-  const [start, setStart] = React.useState(null)
-  const [end, setEnd] = React.useState(null)
+  const [start,    setStart]    = React.useState(null)
+  const [end,      setEnd]      = React.useState(null)
   const [pickMode, setPickMode] = React.useState('start')
 
   const [startAddr, setStartAddr] = React.useState('')
-  const [endAddr, setEndAddr] = React.useState('')
+  const [endAddr,   setEndAddr]   = React.useState('')
 
-  const [routes, setRoutes] = React.useState({ fastest: null, shortest: null })
+  const [routes,       setRoutes]       = React.useState({ fastest: null, shortest: null })
   const [selectedMode, setSelectedMode] = React.useState('fastest')
   const activeRoute = routes?.[selectedMode] || null
 
-  const [steps, setSteps] = React.useState([])
-  const [stepIdx, setStepIdx] = React.useState(0)
+  const [steps,         setSteps]         = React.useState([])
+  const [stepIdx,       setStepIdx]       = React.useState(0)
   const [currentStreet, setCurrentStreet] = React.useState('')
 
   const [loadingBootstrap, setLoadingBootstrap] = React.useState(true)
-  const [loadingEvents, setLoadingEvents] = React.useState(true)
-  const [loadingClosures, setLoadingClosures] = React.useState(true)
-  const [loadingRoute, setLoadingRoute] = React.useState(false)
+  const [loadingEvents,    setLoadingEvents]     = React.useState(true)
+  const [loadingClosures,  setLoadingClosures]   = React.useState(true)
+  const [loadingRoute,     setLoadingRoute]      = React.useState(false)
 
   const [msg, setMsg] = React.useState('Pilih START dan TUJUAN, lalu tekan "Cari Rute".')
 
-  const [myPos, setMyPos] = React.useState(null)
-  const [geoErr, setGeoErr] = React.useState('')
+  const [myPos,    setMyPos]    = React.useState(null)
+  const [geoErr,   setGeoErr]   = React.useState('')
   const [tracking, setTracking] = React.useState(false)
   const [followMe, setFollowMe] = React.useState(true)
 
   const [voiceOn, setVoiceOn] = React.useState(true)
   const [bearing, setBearing] = React.useState(0)
-  const lastPosRef = React.useRef(null)
-  const lastSpokenStepRef = React.useRef({ idx: -1, ts: 0 })
 
-  const mapRef = React.useRef(null)
-  const watchIdRef = React.useRef(null)
+  const lastPosRef         = React.useRef(null)
+  const lastSpokenStepRef  = React.useRef({ idx: -1, ts: 0 })
+  const mapRef             = React.useRef(null)
+  const watchIdRef         = React.useRef(null)
+  const closuresCacheRef   = React.useRef({ data: null, fetchedAt: 0 })
+  const lastStreetFetchRef = React.useRef(0)
+  const reverseCacheRef    = React.useRef(new Map())
+  const reverseAbortRef    = React.useRef({ start: null, end: null })
 
   const [rightPanelOpen, setRightPanelOpen] = React.useState(true)
 
-  const closuresCacheRef = React.useRef({ data: null, fetchedAt: 0 })
-  const lastStreetFetchRef = React.useRef(0)
-  const reverseCacheRef = React.useRef(new Map())
-  const reverseAbortRef = React.useRef({ start: null, end: null })
-
   const isMobile = typeof window !== 'undefined' ? window.innerWidth < 1024 : false
 
-  // ── State BARU: parkir ──────────────────────────────────────────────────────
-  const [parkingSpots, setParkingSpots] = React.useState([])
-  // Dropdown parkir muncul setelah event dipilih; value = spot.id
+  // ── Parking state ────────────────────────────────────────────────────────────
+  const [parkingSpots,     setParkingSpots]     = React.useState([])
   const [selectedParkingId, setSelectedParkingId] = React.useState('')
-  // Spots yang difilter sesuai event yang dipilih
+  const [destinationType,   setDestinationType]   = React.useState(null)
+  // null = belum pilih tujuan, 'event' = tuju event, 'parking' = tuju parkir
+
   const spotsForSelectedEvent = React.useMemo(
     () => parkingSpots.filter(s => String(s.event_id) === String(selectedEventId)),
     [parkingSpots, selectedEventId]
   )
-  // 'event' = user klik "Tuju Lokasi Event", 'parking' = user klik "Tuju Titik Parkir", null = belum
-  const [destinationType, setDestinationType] = React.useState(null)
 
   React.useEffect(() => {
     if (isMobile) setRightPanelOpen(true)
   }, [isMobile])
 
+  // ── Derived ──────────────────────────────────────────────────────────────────
+  const startLabel   = startAddr || (start ? `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}` : null)
+  const endLabel     = endAddr   || (end   ? `${end.lat.toFixed(5)},   ${end.lng.toFixed(5)}`   : null)
+  const canFindRoute = !!start && !!end
+  const activeStep   = steps?.[stepIdx]
+  const nextStep     = steps?.[stepIdx + 1]
+  const distToNext   = myPos && nextStep?.location ? Math.round(haversineM(myPos, nextStep.location)) : null
+  const fastest      = routes.fastest
+  const shortest     = routes.shortest
+  const hasRoutes    = !!fastest || !!shortest
+  const lockPickRoute = tracking
+
+  // ── Reverse geocode ──────────────────────────────────────────────────────────
   function roundKey(lat, lng) { return `${lat.toFixed(5)},${lng.toFixed(5)}` }
 
   async function reverseGeocodeOSM(lat, lng, { signal } = {}) {
-    const key = roundKey(lat, lng)
-    const now = Date.now()
+    const key    = roundKey(lat, lng)
+    const now    = Date.now()
     const cached = reverseCacheRef.current.get(key)
     if (cached && now - cached.ts < REVERSE_GEO_TTL_MS) return cached.label
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`
-    const res = await fetchWithTimeout(url, { timeoutMs: REVERSE_GEO_TIMEOUT_MS, signal, headers: { Accept: 'application/json' } })
+    const res  = await fetchWithTimeout(url, { timeoutMs: REVERSE_GEO_TIMEOUT_MS, signal, headers: { Accept: 'application/json' } })
     if (!res.ok) throw new Error('reverse geocode failed')
-    const data = await res.json()
+    const data  = await res.json()
     const label = data?.display_name || ''
     if (label) reverseCacheRef.current.set(key, { label, ts: now })
     return label
@@ -707,7 +156,7 @@ export default function UserMapPage() {
     if (!latlng) return
     const { lat, lng } = latlng
     try { if (reverseAbortRef.current[mode]) reverseAbortRef.current[mode].abort() } catch {}
-    const ctrl = new AbortController()
+    const ctrl     = new AbortController()
     reverseAbortRef.current[mode] = ctrl
     const fallback = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
     if (mode === 'start') setStartAddr(fallback)
@@ -724,20 +173,19 @@ export default function UserMapPage() {
     }
   }
 
-  // ── Bootstrap: muat events, closures, DAN parking_spots sekaligus ──────────
+  // ── Bootstrap ────────────────────────────────────────────────────────────────
   React.useEffect(() => {
     let alive = true
     ;(async () => {
       setLoadingBootstrap(true); setLoadingEvents(true); setLoadingClosures(true)
       try {
-        const res = await api.get('/map_bootstrap')
+        const res  = await api.get('/map_bootstrap')
         const data = res.data || {}
         if (!alive) return
         setEvents(Array.isArray(data.events) ? data.events : [])
         const cl = Array.isArray(data.closures_active) ? data.closures_active : []
         setClosures(cl)
         closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
-        // ── BARU: parking_spots ──────────────────────────────────────────────
         setParkingSpots(Array.isArray(data.parking_spots) ? data.parking_spots : [])
       } catch (e) {
         if (!alive) return
@@ -750,14 +198,22 @@ export default function UserMapPage() {
     return () => { alive = false }
   }, [])
 
+  // ── Pick handler ─────────────────────────────────────────────────────────────
   function onPick(latlng, mode) {
-    if (mode === 'start') { setStart(latlng); setMsg('START tersimpan. Sekarang pilih TUJUAN.'); fillAddressFor('start', latlng) }
-    else { setEnd(latlng); setMsg('TUJUAN tersimpan. Tekan "Cari Rute".'); fillAddressFor('end', latlng) }
+    if (mode === 'start') {
+      setStart(latlng)
+      setMsg('START tersimpan. Sekarang pilih TUJUAN.')
+      fillAddressFor('start', latlng)
+    } else {
+      setEnd(latlng)
+      setMsg('TUJUAN tersimpan. Tekan "Cari Rute".')
+      fillAddressFor('end', latlng)
+    }
   }
 
-  // ── applyEventAsDestination: set ke lokasi event ────────────────────────────
+  // ── Event / Parking destination ──────────────────────────────────────────────
   function applyEventAsDestination() {
-    const ev = events.find((e) => e.id === selectedEventId)
+    const ev = events.find(e => e.id === selectedEventId)
     if (!ev) return
     const pt = { lat: ev.lat, lng: ev.lng }
     setEnd(pt)
@@ -766,7 +222,6 @@ export default function UserMapPage() {
     fillAddressFor('end', pt)
   }
 
-  // ── applyParkingAsDestination ────────────────────────────────────────────────
   function applyParkingAsDestination() {
     const spot = spotsForSelectedEvent.find(s => String(s.id) === String(selectedParkingId))
     if (!spot) return
@@ -777,19 +232,24 @@ export default function UserMapPage() {
     fillAddressFor('end', pt)
   }
 
+  // ── Closures refresh ─────────────────────────────────────────────────────────
   async function refreshClosures({ force = false, silent = true } = {}) {
     const cache = closuresCacheRef.current
-    if (!force && cache.data && Date.now() - cache.fetchedAt < CLOSURES_TTL_MS) { setClosures(cache.data || []); return }
+    if (!force && cache.data && Date.now() - cache.fetchedAt < CLOSURES_TTL_MS) {
+      setClosures(cache.data || []); return
+    }
     if (!silent) setMsg('Memuat rekayasa jalan...')
     setLoadingClosures(true)
     try {
       const res = await api.get('/map_bootstrap')
-      const cl = Array.isArray(res.data?.closures_active) ? res.data.closures_active : []
-      setClosures(cl); closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
+      const cl  = Array.isArray(res.data?.closures_active) ? res.data.closures_active : []
+      setClosures(cl)
+      closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
     } catch (e) { console.warn('refreshClosures failed:', e) }
     finally { setLoadingClosures(false) }
   }
 
+  // ── Route finding ────────────────────────────────────────────────────────────
   async function findRoute(customStart, customEnd, { silent = false } = {}) {
     const s = customStart || start, e = customEnd || end
     if (!s || !e) { if (!silent) setMsg('START dan TUJUAN wajib diisi.'); return }
@@ -797,11 +257,12 @@ export default function UserMapPage() {
     if (!silent) setMsg('Menghitung rute A* (tercepat & terpendek)...')
     setRoutes({ fastest: null, shortest: null }); setSteps([]); setStepIdx(0)
     try {
-      const res = await api.post('/route', { start: s, end: e, mode: 'both' })
-      const data = res.data || {}
-      const fastest = data.fastest || null, shortest = data.shortest || null
+      const res     = await api.post('/route', { start: s, end: e, mode: 'both' })
+      const data    = res.data || {}
+      const fastest = data.fastest || null
+      const shortest = data.shortest || null
       setRoutes({ fastest, shortest })
-      const chosen = (selectedMode === 'shortest' ? shortest : fastest) || fastest || shortest
+      const chosen  = (selectedMode === 'shortest' ? shortest : fastest) || fastest || shortest
       if (chosen) { setSteps(Array.isArray(chosen.steps) ? chosen.steps : []); setStepIdx(0) }
       if (!silent) {
         const mins = chosen?.total_time_sec ? (chosen.total_time_sec / 60).toFixed(1) : '?'
@@ -818,14 +279,16 @@ export default function UserMapPage() {
     if (!s || !e) return
     try {
       const res = await api.post('/route', { start: s, end: e, mode: selectedMode })
-      const r = res.data || null
+      const r   = res.data || null
       if (!r) return
-      setRoutes((prev) => ({ ...prev, [selectedMode]: r }))
-      setSteps(Array.isArray(r.steps) ? r.steps : []); setStepIdx(0)
+      setRoutes(prev => ({ ...prev, [selectedMode]: r }))
+      setSteps(Array.isArray(r.steps) ? r.steps : [])
+      setStepIdx(0)
       await refreshClosures({ force: true, silent: true })
     } catch (err) { console.warn('rerouteSelected failed:', err) }
   }
 
+  // ── Geolocation ──────────────────────────────────────────────────────────────
   function useMyLocationAsStart() {
     setGeoErr('')
     if (!navigator.geolocation) return setGeoErr('Browser tidak mendukung Geolocation.')
@@ -875,6 +338,7 @@ export default function UserMapPage() {
     watchIdRef.current = null; setTracking(false); setMsg('Navigasi dimatikan.')
   }
 
+  // ── Effects ──────────────────────────────────────────────────────────────────
   React.useEffect(() => () => stopTracking(), [])
 
   React.useEffect(() => {
@@ -890,14 +354,14 @@ export default function UserMapPage() {
     if (!tracking || !myPos || steps.length < 2 || stepIdx >= steps.length - 1) return
     const next = steps[stepIdx + 1]
     if (!next?.location) return
-    if (haversineM(myPos, next.location) <= STEP_TRIGGER_M) setStepIdx((i) => Math.min(i + 1, steps.length - 1))
+    if (haversineM(myPos, next.location) <= STEP_TRIGGER_M) setStepIdx(i => Math.min(i + 1, steps.length - 1))
   }, [tracking, myPos?.lat, myPos?.lng, steps, stepIdx])
 
   React.useEffect(() => {
     if (!tracking || !voiceOn) return
     const st = steps?.[stepIdx]
     if (!st?.instruction) return
-    const now = Date.now()
+    const now  = Date.now()
     const last = lastSpokenStepRef.current
     if (last.idx === stepIdx && now - last.ts < 5000) return
     lastSpokenStepRef.current = { idx: stepIdx, ts: now }
@@ -929,33 +393,31 @@ export default function UserMapPage() {
     return () => clearInterval(id)
   }, [tracking])
 
-  const startLabel = startAddr || (start ? `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}` : null)
-  const endLabel = endAddr || (end ? `${end.lat.toFixed(5)}, ${end.lng.toFixed(5)}` : null)
-  const canFindRoute = !!start && !!end
-  const activeStep = steps?.[stepIdx]
-  const nextStep = steps?.[stepIdx + 1]
-  const distToNext = myPos && nextStep?.location ? Math.round(haversineM(myPos, nextStep.location)) : null
-  const fastest = routes.fastest, shortest = routes.shortest
-  const hasRoutes = !!fastest || !!shortest
-  const lockPickRoute = tracking
-
+  // ── Recenter ─────────────────────────────────────────────────────────────────
   const handleRecenter = () => {
     if (!mapRef.current) return
-    if (myPos) mapRef.current.flyTo([myPos.lat, myPos.lng], Math.max(mapRef.current.getZoom(), FOLLOW_ZOOM), { animate: true, duration: 0.6 })
+    if (myPos)  mapRef.current.flyTo([myPos.lat,  myPos.lng],  Math.max(mapRef.current.getZoom(), FOLLOW_ZOOM), { animate: true, duration: 0.6 })
     else if (start) mapRef.current.flyTo([start.lat, start.lng], 16, { animate: true, duration: 0.6 })
     else mapRef.current.flyTo(DEFAULT_CENTER, 13, { animate: true, duration: 0.6 })
   }
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="bg-gray-50">
       <div className="relative w-full" style={{ height: `calc(100vh - ${NAVBAR_H_PX}px)` }}>
+
         <MapBadge tracking={tracking} followMe={followMe} voiceOn={voiceOn} />
         <InstructionOverlay tracking={tracking} activeStep={activeStep} distToNext={distToNext} />
-        <RouteSummaryBar activeRoute={activeRoute} selectedMode={selectedMode} tracking={tracking} myPos={myPos} end={end} onRecenter={handleRecenter} />
+        <RouteSummaryBar
+          activeRoute={activeRoute} selectedMode={selectedMode}
+          tracking={tracking} myPos={myPos} end={end}
+          onRecenter={handleRecenter}
+        />
 
-        <RightDockPanel open={rightPanelOpen} onToggle={() => setRightPanelOpen((v) => !v)} title="RUTE SURO">
+        {/* ── Right Panel ── */}
+        <RightDockPanel open={rightPanelOpen} onToggle={() => setRightPanelOpen(v => !v)} title="RUTE SURO">
 
-          {/* ── Loading state ── */}
+          {/* Loading */}
           {loadingBootstrap && (
             <div className="mb-4 rounded-2xl border border-[#8b1a1a]/20 bg-[#FEF5F5] p-3">
               <div className="flex items-center gap-2 mb-2">
@@ -977,13 +439,13 @@ export default function UserMapPage() {
             </div>
           )}
 
-          {/* ── Status msg ── */}
+          {/* Status */}
           <div className="mb-3 rounded-2xl border border-[#DDD8D0] bg-[#F4F2EF] px-3 py-2.5">
             <p className="text-[11px] font-extrabold tracking-[0.08em] text-[#6B6560] uppercase mb-1">Status</p>
             <p className="text-xs font-semibold text-[#2B3440] leading-relaxed">{msg}</p>
           </div>
 
-          {/* ── Location inputs (tidak berubah) ── */}
+          {/* Location inputs */}
           <div className="mb-1">
             <div className="relative flex flex-col gap-1.5">
               <LocationRow
@@ -1010,7 +472,7 @@ export default function UserMapPage() {
             </div>
           </div>
 
-          {/* Use my location button (tidak berubah) */}
+          {/* Use my location */}
           <button
             onClick={useMyLocationAsStart}
             className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-[#DDD8D0] bg-white hover:bg-[#F4F2EF] text-[#2B3440] font-bold text-sm transition hover:border-[#8b1a1a]/40"
@@ -1019,9 +481,7 @@ export default function UserMapPage() {
             Pakai Lokasi Saya sebagai START
           </button>
 
-          {/* ══════════════════════════════════════════════════════════════
-              SECTION BARU: Event + Parkir sebagai Tujuan
-              ══════════════════════════════════════════════════════════════ */}
+          {/* ── Section: Event & Parkir ── */}
           <SectionDivider label="Tujuan Event" />
 
           <div className="mb-1">
@@ -1034,61 +494,54 @@ export default function UserMapPage() {
               </p>
             </div>
 
-            {/* Step 1: Pilih event */}
-            <p className="text-[10px] font-bold text-[#6B6560] uppercase tracking-wide mb-1">
-              1. Pilih Event
-            </p>
+            {/* Step 1: pilih event */}
+            <p className="text-[10px] font-bold text-[#6B6560] uppercase tracking-wide mb-1">1. Pilih Event</p>
             <select
               value={selectedEventId}
               onChange={(e) => {
                 setSelectedEventId(e.target.value)
-                setSelectedParkingId('') // reset pilihan parkir saat event berubah
-                setDestinationType(null) // reset tipe tujuan
+                setSelectedParkingId('')
+                setDestinationType(null)
               }}
               className="w-full px-3 py-2.5 border border-[#DDD8D0] rounded-xl text-[#2B3440] font-semibold text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#8b1a1a]/30 focus:border-[#8b1a1a] transition"
             >
               <option value="">-- pilih event --</option>
-              {events.map((ev) => (
+              {events.map(ev => (
                 <option key={ev.id} value={ev.id}>
                   {ev.name}{ev.start_time ? ` (${dayjs(ev.start_time).format('DD/MM HH:mm')})` : ''}
                 </option>
               ))}
             </select>
 
-            {/* Tombol: langsung ke lokasi event */}
+            {/* Tombol tuju lokasi event */}
             {selectedEventId && (
               <button
                 onClick={applyEventAsDestination}
-                className={`w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 font-bold rounded-xl text-sm border transition ${
+                className={`w-full mt-2 flex items-center justify-center gap-2 px-3 py-2.5 font-bold rounded-xl text-sm border transition ${
                   destinationType === 'event'
                     ? 'bg-[#6b1414] text-white border-[#6b1414] ring-2 ring-[#8b1a1a]/40'
                     : 'bg-[#8b1a1a] hover:bg-[#6b1414] text-white border-[#8b1a1a]'
                 }`}
               >
                 <IconMapPin className="w-3.5 h-3.5" />
-                {destinationType === 'event' ? '🎯 Lokasi Event Dipilih' : 'Tuju Lokasi Event'}
+                {destinationType === 'event' ? 'Lokasi Event Dipilih' : 'Tuju Lokasi Event'}
               </button>
             )}
 
-            {/* Step 2: Pilih parkir (hanya muncul jika event dipilih) */}
+            {/* Step 2: pilih parkir */}
             {selectedEventId && (
               <div className="mt-3">
-                {/* Garis tipis pemisah */}
                 <div className="flex items-center gap-2 mb-2">
                   <div className="flex-1 h-px bg-[#DDD8D0]" />
                   <span className="text-[10px] font-bold text-[#6B6560] uppercase tracking-wide">atau ke parkir</span>
                   <div className="flex-1 h-px bg-[#DDD8D0]" />
                 </div>
 
-                <p className="text-[10px] font-bold text-[#6B6560] uppercase tracking-wide mb-1">
-                  2. Pilih Titik Parkir
-                </p>
+                <p className="text-[10px] font-bold text-[#6B6560] uppercase tracking-wide mb-1">2. Pilih Titik Parkir</p>
 
                 {spotsForSelectedEvent.length === 0 ? (
                   <div className="px-3 py-2.5 rounded-xl border border-dashed border-[#DDD8D0] bg-[#F4F2EF] text-center">
-                    <p className="text-xs text-[#A09890] font-semibold">
-                      🅿️ Belum ada titik parkir untuk event ini
-                    </p>
+                    <p className="text-xs text-[#A09890] font-semibold">Belum ada titik parkir untuk event ini</p>
                   </div>
                 ) : (
                   <>
@@ -1098,10 +551,9 @@ export default function UserMapPage() {
                       className="w-full px-3 py-2.5 border border-[#DDD8D0] rounded-xl text-[#2B3440] font-semibold text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400/30 focus:border-blue-500 transition"
                     >
                       <option value="">-- pilih titik parkir --</option>
-                      {spotsForSelectedEvent.map((spot) => (
+                      {spotsForSelectedEvent.map(spot => (
                         <option key={spot.id} value={spot.id}>
-                          🅿️ {spot.name}
-                          {spot.capacity ? ` (${spot.capacity} kend.)` : ''}
+                          {spot.name}{spot.capacity ? ` (${spot.capacity} kend.)` : ''}
                         </option>
                       ))}
                     </select>
@@ -1109,7 +561,7 @@ export default function UserMapPage() {
                     <button
                       onClick={applyParkingAsDestination}
                       disabled={!selectedParkingId}
-                      className={`w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 font-bold rounded-xl text-sm border transition ${
+                      className={`w-full mt-2 flex items-center justify-center gap-2 px-3 py-2.5 font-bold rounded-xl text-sm border transition ${
                         !selectedParkingId
                           ? 'bg-[#F4F2EF] text-[#A09890] border-[#DDD8D0] cursor-not-allowed'
                           : destinationType === 'parking'
@@ -1119,7 +571,7 @@ export default function UserMapPage() {
                     >
                       <IconMapPin className="w-3.5 h-3.5" />
                       {destinationType === 'parking' && selectedParkingId
-                        ? `⭐ ${spotsForSelectedEvent.find(s => String(s.id) === String(selectedParkingId))?.name ?? 'Parkir Dipilih'}`
+                        ? spotsForSelectedEvent.find(s => String(s.id) === String(selectedParkingId))?.name ?? 'Parkir Dipilih'
                         : 'Tuju Titik Parkir'
                       }
                     </button>
@@ -1128,11 +580,10 @@ export default function UserMapPage() {
               </div>
             )}
           </div>
-          {/* ═══════════════════════════════════════════════════════════════ */}
 
           <SectionDivider label="Navigasi" />
 
-          {/* ── Turn by turn (tidak berubah) ── */}
+          {/* Turn by turn */}
           {tracking && (activeStep || currentStreet) && (
             <div className="mb-3">
               {currentStreet && (
@@ -1147,7 +598,7 @@ export default function UserMapPage() {
                     <span className="flex-shrink-0 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white mt-0.5">
                       {(() => {
                         const t = (activeStep.type || '').toLowerCase()
-                        if (t.includes('left')) return <IconArrowTurnLeft className="w-4 h-4" />
+                        if (t.includes('left'))  return <IconArrowTurnLeft className="w-4 h-4" />
                         if (t.includes('right')) return <IconArrowTurnRight className="w-4 h-4" />
                         return <IconArrowUp className="w-4 h-4" />
                       })()}
@@ -1172,7 +623,7 @@ export default function UserMapPage() {
             </div>
           )}
 
-          {/* ── Cari Rute (tidak berubah) ── */}
+          {/* Cari Rute */}
           <button
             onClick={() => findRoute()}
             disabled={loadingRoute || !canFindRoute}
@@ -1188,7 +639,7 @@ export default function UserMapPage() {
             }
           </button>
 
-          {/* ── Mulai / Stop Navigasi (tidak berubah) ── */}
+          {/* Mulai / Stop Navigasi */}
           <button
             onClick={() => tracking ? stopTracking() : startTracking()}
             disabled={!activeRoute && !tracking}
@@ -1206,14 +657,12 @@ export default function UserMapPage() {
             }
           </button>
 
-          {/* ── Kontrol sekunder (tidak berubah) ── */}
+          {/* Kontrol sekunder */}
           <div className="grid grid-cols-3 gap-2 mb-3">
             <button
-              onClick={() => setFollowMe((v) => !v)}
+              onClick={() => setFollowMe(v => !v)}
               className={`flex flex-col items-center justify-center gap-1 px-2 py-2.5 rounded-xl font-bold text-xs border transition ${
-                followMe
-                  ? 'bg-[#2B3440] text-white border-[#2B3440]'
-                  : 'bg-white text-[#2B3440] border-[#DDD8D0] hover:bg-[#F4F2EF]'
+                followMe ? 'bg-[#2B3440] text-white border-[#2B3440]' : 'bg-white text-[#2B3440] border-[#DDD8D0] hover:bg-[#F4F2EF]'
               }`}
             >
               <IconFollow className="w-4 h-4" />
@@ -1221,11 +670,9 @@ export default function UserMapPage() {
             </button>
 
             <button
-              onClick={() => setVoiceOn((v) => !v)}
+              onClick={() => setVoiceOn(v => !v)}
               className={`flex flex-col items-center justify-center gap-1 px-2 py-2.5 rounded-xl font-bold text-xs border transition ${
-                voiceOn
-                  ? 'bg-[#8b1a1a] text-white border-[#8b1a1a] hover:bg-[#6b1414]'
-                  : 'bg-white text-[#2B3440] border-[#DDD8D0] hover:bg-[#F4F2EF]'
+                voiceOn ? 'bg-[#8b1a1a] text-white border-[#8b1a1a] hover:bg-[#6b1414]' : 'bg-white text-[#2B3440] border-[#DDD8D0] hover:bg-[#F4F2EF]'
               }`}
             >
               {voiceOn ? <IconVolume className="w-4 h-4" /> : <IconVolumeMute className="w-4 h-4" />}
@@ -1246,7 +693,7 @@ export default function UserMapPage() {
             </button>
           </div>
 
-          {/* ── Alternatif rute (tidak berubah) ── */}
+          {/* Pilih rute alternatif */}
           {hasRoutes && (
             <div className="mb-3">
               <div className="flex items-center justify-between mb-2">
@@ -1262,7 +709,6 @@ export default function UserMapPage() {
                   </span>
                 )}
               </div>
-
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -1317,7 +763,7 @@ export default function UserMapPage() {
             </div>
           )}
 
-          {/* ── Geo error (tidak berubah) ── */}
+          {/* Geo error */}
           {geoErr && (
             <div className="flex items-start gap-2 text-xs text-[#8b1a1a] font-semibold bg-[#FEF5F5] border border-[#8b1a1a]/30 rounded-xl p-3 mb-3">
               <IconAlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-[#8b1a1a]" />
@@ -1325,7 +771,7 @@ export default function UserMapPage() {
             </div>
           )}
 
-          {/* ── Road info (tidak berubah) ── */}
+          {/* Informasi peta / legend */}
           <div className="rounded-2xl border border-[#DDD8D0] bg-[#F4F2EF] p-3">
             <div className="flex items-center gap-2 mb-1.5">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#8b1a1a] text-white">
@@ -1333,33 +779,59 @@ export default function UserMapPage() {
               </span>
               <p className="text-xs font-extrabold text-[#2B3440] uppercase tracking-wide">Informasi Peta</p>
             </div>
+            {/* Jalan ditutup */}
             <div className="flex items-center gap-2 text-xs text-[#2B3440] font-semibold ml-9">
               <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block w-3 h-1.5 bg-red-600 rounded-sm" />
-                <span>Jalan ditutup (rekayasa lalu lintas)</span>
+                <span className="inline-block w-4 h-1.5 bg-red-600 rounded-sm" />
+                <span>Jalan ditutup (rekayasa)</span>
               </span>
             </div>
+            {/* Rute tercepat */}
             <div className="flex items-center gap-2 text-xs text-[#2B3440] font-semibold ml-9 mt-1">
               <span className="inline-flex items-center gap-1.5">
-                <span className="inline-flex w-5 h-5 items-center justify-center rounded-md bg-blue-700 text-white text-[9px] font-black">P</span>
-                <span>Titik parkir (biru = tersedia)</span>
+                <span className="inline-block w-4 h-1.5 bg-blue-700 rounded-sm" />
+                <span>Rute tercepat (aktif)</span>
               </span>
             </div>
+            {/* Rute terpendek */}
             <div className="flex items-center gap-2 text-xs text-[#2B3440] font-semibold ml-9 mt-1">
               <span className="inline-flex items-center gap-1.5">
-                <span className="inline-flex w-5 h-5 items-center justify-center rounded-md bg-amber-400 text-white text-[9px] font-black">P</span>
-                <span>Parkir dipilih sebagai tujuan</span>
+                <span className="inline-block w-4 h-1.5 rounded-sm" style={{ background: '#38bdf8' }} />
+                <span>Rute terpendek (aktif)</span>
               </span>
             </div>
+            {/* Rute tidak aktif */}
             <div className="flex items-center gap-2 text-xs text-[#2B3440] font-semibold ml-9 mt-1">
               <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block w-3 h-3 rounded-full bg-gray-400/60 border border-gray-500" />
+                <span className="inline-block w-4 h-1.5 bg-gray-400 rounded-sm opacity-70" style={{ backgroundImage: 'repeating-linear-gradient(90deg,#9ca3af 0,#9ca3af 4px,transparent 4px,transparent 8px)' }} />
+                <span>Rute alternatif (tidak aktif)</span>
+              </span>
+            </div>
+            {/* Parkir — kotak biru rambu P */}
+            <div className="flex items-center gap-2 text-xs text-[#2B3440] font-semibold ml-9 mt-1">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center justify-center w-[14px] h-[14px] rounded-[3px] bg-[#1a47a0] text-white font-black text-[9px] leading-none" style={{fontFamily:'Arial,sans-serif'}}>P</span>
+                <span>Titik parkir tersedia</span>
+              </span>
+            </div>
+            {/* Parkir/event dipilih — marker merah Leaflet kecil */}
+            <div className="flex items-center gap-2 text-xs text-[#2B3440] font-semibold ml-9 mt-1">
+              <span className="inline-flex items-center gap-1.5">
+                <img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" style={{width:'8px',height:'13px',filter:'hue-rotate(140deg) saturate(3) brightness(0.85)'}} alt="" />
+                <span>Parkir / tujuan dipilih</span>
+              </span>
+            </div>
+            {/* Event preview — marker biru Leaflet kecil */}
+            <div className="flex items-center gap-2 text-xs text-[#2B3440] font-semibold ml-9 mt-1">
+              <span className="inline-flex items-center gap-1.5">
+                <img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" style={{width:'8px',height:'13px'}} alt="" />
                 <span>Lokasi event (preview)</span>
               </span>
             </div>
+            {/* Event dipilih — marker merah Leaflet lebih besar */}
             <div className="flex items-center gap-2 text-xs text-[#2B3440] font-semibold ml-9 mt-1">
               <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block w-3 h-3 rounded-full bg-red-600" />
+                <img src="https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" style={{width:'10px',height:'16px',filter:'hue-rotate(140deg) saturate(3) brightness(0.85)'}} alt="" />
                 <span>Tujuan event dipilih</span>
               </span>
             </div>
@@ -1385,162 +857,28 @@ export default function UserMapPage() {
           />
           <ClickSetter mode={pickMode} onPick={onPick} />
 
-          {myPos && (
-            <>
-              <Marker position={[myPos.lat, myPos.lng]} icon={makeArrowIcon(bearing)}>
-                <Popup><b>Posisi Saya</b><br />Bearing: {Math.round(bearing)}°</Popup>
-              </Marker>
-              <CircleMarker center={[myPos.lat, myPos.lng]} radius={6} pathOptions={{ color: '#2563eb' }}>
-                <Tooltip direction="top" offset={[0, -8]} opacity={0.9}>Saya</Tooltip>
-              </CircleMarker>
-            </>
-          )}
-
-          {start && <Marker position={[start.lat, start.lng]}><Popup>Start</Popup></Marker>}
-          {end && <Marker position={[end.lat, end.lng]}><Popup>Tujuan</Popup></Marker>}
-
-          {/* ── Marker lokasi event:
-               - Preview (abu transparan) = event dipilih tapi belum klik "Tuju Lokasi Event"
-               - Selected (merah 🎯)     = setelah klik "Tuju Lokasi Event"              ── */}
-          {selectedEventId && (() => {
-            const ev = events.find(e => String(e.id) === String(selectedEventId))
-            if (!ev?.lat || !ev?.lng) return null
-            const isEventDest = destinationType === 'event'
-            return (
-              <Marker
-                key={`event_marker_${ev.id}`}
-                position={[ev.lat, ev.lng]}
-                icon={isEventDest ? makeEventSelectedIcon() : makeEventPreviewIcon()}
-                zIndexOffset={isEventDest ? 900 : 100}
-              >
-                <Popup>
-                  <div style={{ minWidth: '160px' }}>
-                    <p style={{ fontWeight: 'bold', marginBottom: '4px', color: isEventDest ? '#dc2626' : '#374151' }}>
-                      {isEventDest ? '🎯 ' : '📍 '}{ev.name}
-                    </p>
-                    {ev.location && <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>{ev.location}</p>}
-                    {!isEventDest && (
-                      <button
-                        style={{ padding: '5px 10px', background: '#8b1a1a', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px', width: '100%' }}
-                        onClick={applyEventAsDestination}
-                      >
-                        Jadikan Tujuan
-                      </button>
-                    )}
-                    {isEventDest && (
-                      <p style={{ fontSize: '11px', color: '#dc2626', fontWeight: '700' }}>✓ Dipilih sebagai tujuan</p>
-                    )}
-                  </div>
-                </Popup>
-              </Marker>
-            )
-          })()}
-
-          {/* ── Marker titik parkir: ikon "P" biru (biasa) / gold (dipilih) ── */}
-          {selectedEventId && spotsForSelectedEvent.map((spot) => {
-            const isSelected = destinationType === 'parking' && String(spot.id) === String(selectedParkingId)
-            return (
-              <Marker
-                key={`parking_${spot.id}`}
-                position={[spot.lat, spot.lng]}
-                icon={makeParkingIcon(isSelected)}
-                zIndexOffset={isSelected ? 1000 : 0}
-              >
-                <Popup>
-                  <div style={{ minWidth: '160px' }}>
-                    <p style={{ fontWeight: 'bold', marginBottom: '4px', color: isSelected ? '#d97706' : '#1d4ed8' }}>
-                      {isSelected ? '⭐ ' : '🅿️ '}{spot.name}{isSelected ? ' (Tujuan)' : ''}
-                    </p>
-                    {spot.description && <p style={{ fontSize: '12px', color: '#555', marginBottom: '2px' }}>{spot.description}</p>}
-                    {spot.capacity != null && (
-                      <p style={{ fontSize: '12px', color: '#1d4ed8', fontWeight: '600', marginBottom: '6px' }}>
-                        Kapasitas: {spot.capacity} kendaraan
-                      </p>
-                    )}
-                    <button
-                      style={{
-                        padding: '5px 10px',
-                        background: isSelected ? '#d97706' : '#1d4ed8',
-                        color: 'white', border: 'none', borderRadius: '6px',
-                        fontWeight: 'bold', cursor: 'pointer', fontSize: '12px', width: '100%'
-                      }}
-                      onClick={() => {
-                        const pt = { lat: spot.lat, lng: spot.lng }
-                        setEnd(pt)
-                        setSelectedParkingId(String(spot.id))
-                        setDestinationType('parking')
-                        setMsg(`Tujuan di-set ke parkir: ${spot.name}. Tekan "Cari Rute".`)
-                        fillAddressFor('end', pt)
-                      }}
-                    >
-                      {isSelected ? '✓ Tujuan Aktif' : 'Jadikan Tujuan'}
-                    </button>
-                  </div>
-                </Popup>
-              </Marker>
-            )
-          })}
-
-          {/* Closures (tidak berubah) */}
-          {closures.map((c) => {
-            const edgeList = Array.isArray(c.edges) ? c.edges : []
-            const multi = edgeList
-              .map((e) => (Array.isArray(e.polyline) ? e.polyline : null))
-              .filter((pl) => Array.isArray(pl) && pl.length > 1)
-              .map((pl) => pl.map((p) => [p.lat, p.lng]))
-            if (!multi.length) return null
-            const reason = c.reason || 'Rekayasa / ditutup'
-            return (
-              <Polyline
-                key={`closure_${c.id}`}
-                positions={multi}
-                pathOptions={{ color: 'red', weight: 6 }}
-                eventHandlers={{
-                  mouseover: (e) => { try { e?.target?.openTooltip?.(); const el = e?.target?.getTooltip?.()?.getElement?.(); if (el) { el.classList.remove('closure-hidden'); el.classList.add('closure-show') } } catch {} },
-                  mouseout: (e) => { try { const el = e?.target?.getTooltip?.()?.getElement?.(); if (el) { el.classList.remove('closure-show'); el.classList.add('closure-hidden') } e?.target?.closeTooltip?.() } catch {} },
-                  click: (e) => { try { e?.originalEvent?.preventDefault?.(); const t = e?.target; t?.openTooltip?.(); const el = t?.getTooltip?.()?.getElement?.(); if (el) { const isShown = el.classList.contains('closure-show'); el.classList.toggle('closure-show', !isShown); el.classList.toggle('closure-hidden', isShown) } } catch {} }
-                }}
-              >
-                <Tooltip permanent={false} sticky direction="top" offset={[0, -10]} className="closure-pill-tooltip closure-hidden" opacity={1}>
-                  DITUTUP: {reason}
-                </Tooltip>
-                <Popup><b>Ditutup</b><br />{reason}</Popup>
-              </Polyline>
-            )
-          })}
-
-          {routes.fastest?.polyline && (
-            <Polyline
-              positions={routes.fastest.polyline.map((p) => [p.lat, p.lng])}
-              pathOptions={{
-                color:   selectedMode === 'fastest' ? '#1d4ed8' : '#6b7280',
-                weight:  selectedMode === 'fastest' ? 7 : 4,
-                opacity: selectedMode === 'fastest' ? 1 : 0.4,
-              }}
-            >
-              <Tooltip sticky>Tercepat • {fmtMin(routes.fastest?.total_time_sec)} • {fmtKm(routes.fastest?.total_length_m)}</Tooltip>
-            </Polyline>
-          )}
-
-          {routes.shortest?.polyline && (
-            <Polyline
-              positions={routes.shortest.polyline.map((p) => [p.lat, p.lng])}
-              pathOptions={{
-                color:     selectedMode === 'shortest' ? '#38bdf8' : '#6b7280',
-                weight:    selectedMode === 'shortest' ? 7 : 4,
-                opacity:   selectedMode === 'shortest' ? 1 : 0.4,
-                dashArray: selectedMode === 'shortest' ? undefined : '8 10',
-              }}
-            >
-              <Tooltip sticky>Terpendek • {fmtMin(routes.shortest?.total_time_sec)} • {fmtKm(routes.shortest?.total_length_m)}</Tooltip>
-            </Polyline>
-          )}
-
-          {tracking && nextStep?.location ? (
-            <CircleMarker center={[nextStep.location.lat, nextStep.location.lng]} radius={6} pathOptions={{ color: '#10b981' }}>
-              <Popup><b>Step berikutnya</b><br />{nextStep.instruction || '-'}</Popup>
-            </CircleMarker>
-          ) : null}
+          <MapLayers
+            myPos={myPos}
+            bearing={bearing}
+            start={start}
+            end={end}
+            selectedEventId={selectedEventId}
+            events={events}
+            destinationType={destinationType}
+            spotsForSelectedEvent={spotsForSelectedEvent}
+            selectedParkingId={selectedParkingId}
+            closures={closures}
+            routes={routes}
+            selectedMode={selectedMode}
+            tracking={tracking}
+            nextStep={nextStep}
+            setEnd={setEnd}
+            setSelectedParkingId={setSelectedParkingId}
+            setDestinationType={setDestinationType}
+            setMsg={setMsg}
+            fillAddressFor={fillAddressFor}
+            applyEventAsDestination={applyEventAsDestination}
+          />
         </MapContainer>
       </div>
     </div>
