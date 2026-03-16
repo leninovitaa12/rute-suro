@@ -361,3 +361,51 @@ export const deleteParkingSpot = async (spotId) => {
     throw error
   }
 }
+
+// ── GET semua poster 
+export async function getPoster() {
+  const { data, error } = await supabase
+    .from('poster')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data || []
+}
+
+// ── CREATE poster 
+export async function createPoster(formData) {
+  // formData: { title, description, image_url }
+  const { data, error } = await supabase
+    .from('poster')
+    .insert([formData])
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+// ── UPDATE poster 
+export async function updatePoster(id, formData) {
+  const { data, error } = await supabase
+    .from('poster')
+    .update(formData)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+// ── DELETE poster 
+export async function deletePoster(id) {
+  const { error } = await supabase
+    .from('poster')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+  return true
+}
