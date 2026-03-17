@@ -15,7 +15,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-const mockEvents   = [
+const mockEvents = [
   { id: 1, name: 'Kirab Pusaka Grebeg Suro', start_time: '2024-08-01T08:00:00', end_time: '2024-08-01T12:00:00', lat: -7.871, lng: 111.462 },
   { id: 2, name: 'Festival Reog',            start_time: '2024-08-02T10:00:00', end_time: '2024-08-02T16:00:00', lat: -7.873, lng: 111.465 },
 ]
@@ -28,25 +28,25 @@ const toIso   = v => { const d = new Date(v); return isNaN(d) ? null : d.toISOSt
 const swal    = (icon, title, opts = {}) => Swal.fire({ icon, title, confirmButtonColor: icon === 'success' ? '#16a34a' : icon === 'error' ? '#dc2626' : '#2563eb', confirmButtonText: icon === 'error' ? 'Tutup' : 'OK', ...opts })
 const swalOK  = (title, text) => swal('success', title, { text, timer: 3000, timerProgressBar: true })
 const swalErr = (title, text) => swal('error', title, { text: text || 'Terjadi kesalahan.' })
-const swalDel = name  => Swal.fire({ icon: 'warning', title: 'Hapus data ini?', html: `<span style="color:#374151;font-size:14px"><b>${name}</b> akan dihapus permanen.</span>`, showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', reverseButtons: true })
+const swalDel = name => Swal.fire({ icon: 'warning', title: 'Hapus data ini?', html: `<span style="color:#374151;font-size:14px"><b>${name}</b> akan dihapus permanen.</span>`, showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', reverseButtons: true })
 
+// ─── MapPicker ────────────────────────────────────────────────────────────────
 function MapPicker({ onPick }) {
   useMapEvents({ click: e => onPick({ lat: e.latlng.lat, lng: e.latlng.lng }) })
   return null
 }
 
-// ─── Reusable shared form field components ────────────────────────────────────
+// ─── Form field components ────────────────────────────────────────────────────
 const Lbl  = ({ text }) => <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">{text}</label>
 const Sel  = ({ value, onChange, cls = '', children }) => <select value={value} onChange={onChange} className={`w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 transition bg-white ${cls}`}>{children}</select>
 const Inp  = ({ value, onChange, placeholder, cls = '' }) => <input type="text" value={value} onChange={onChange} placeholder={placeholder} className={`w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 transition ${cls}`} />
 const DtIn = ({ value, onChange, cls = '' }) => <input type="datetime-local" value={value} onChange={onChange} className={`w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 transition ${cls}`} />
 
-// ─── Shared hook: map pick + derive ──────────────────────────────────────────
+// ─── useEdgePicker ────────────────────────────────────────────────────────────
 function useEdgePicker() {
-  const [pickA, setPickA]   = useState(null)
-  const [pickB, setPickB]   = useState(null)
-  const [edges, setEdges]   = useState([])
-
+  const [pickA, setPickA] = useState(null)
+  const [pickB, setPickB] = useState(null)
+  const [edges, setEdges] = useState([])
   const reset = () => { setPickA(null); setPickB(null); setEdges([]) }
   const onMapClick = p => {
     if (!pickA) setPickA(p)
@@ -68,7 +68,7 @@ function useEdgePicker() {
   return { pickA, pickB, edges, setEdges, reset, onMapClick, derive }
 }
 
-// ─── Reusable: titik A/B display + derive buttons ────────────────────────────
+// ─── PickerPanel ─────────────────────────────────────────────────────────────
 function PickerPanel({ pickA, pickB, edges, onDerive, onReset, accentColor = 'bg-blue-600' }) {
   return (
     <>
@@ -95,7 +95,7 @@ function PickerPanel({ pickA, pickB, edges, onDerive, onReset, accentColor = 'bg
   )
 }
 
-// ─── Reusable: histori list row ───────────────────────────────────────────────
+// ─── HistoryRow ───────────────────────────────────────────────────────────────
 function HistoryRow({ item, editingId, onEdit, onDelete, badgeClass, badgeLabel, extraInfo }) {
   return (
     <div className={`flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors ${editingId === item.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}>
@@ -115,11 +115,14 @@ function HistoryRow({ item, editingId, onEdit, onDelete, badgeClass, badgeLabel,
   )
 }
 
+// ─── Tinggi map & form: konstanta tunggal ─────────────────────────────────────
+// Ubah nilai ini jika ingin map lebih tinggi/pendek
+const MAP_HEIGHT = 620
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdminTraffic() {
   const [activeTab, setActiveTab] = useState('closure')
 
-  // Closures
   const [closures,  setClosures]  = useState([])
   const [events,    setEvents]    = useState([])
   const [loading,   setLoading]   = useState(true)
@@ -129,15 +132,13 @@ export default function AdminTraffic() {
   const [clForm, setClForm] = useState(EMPTY_CL)
   const clPicker = useEdgePicker()
 
-  // Congestion
-  const [congestions,   setCongestions]   = useState([])
-  const [loadingCong,   setLoadingCong]   = useState(true)
-  const [cgSaving,      setCgSaving]      = useState(false)
+  const [congestions, setCongestions] = useState([])
+  const [loadingCong, setLoadingCong] = useState(true)
+  const [cgSaving,    setCgSaving]    = useState(false)
   const EMPTY_CG = { id: null, event_id: '', level: 'MODERATE', reason: '', start_time: '', end_time: '' }
   const [cgForm, setCgForm] = useState(EMPTY_CG)
   const cgPicker = useEdgePicker()
 
-  // ── Load ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     ;(async () => {
       try {
@@ -227,13 +228,12 @@ export default function AdminTraffic() {
     catch (e) { swalErr('Gagal Menghapus', e?.message) }
   }
 
-  // ── Shared field style shortcuts ──────────────────────────────────────────
   const fcl = 'focus:ring-red-500/20 focus:border-red-400'
   const fcg = 'focus:ring-orange-500/20 focus:border-orange-400'
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div>
+      {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Rekayasa Lalu Lintas</h1>
         <p className="text-gray-600 mt-1">Kelola penutupan jalan dan zona kemacetan</p>
@@ -246,7 +246,7 @@ export default function AdminTraffic() {
         </div>
       )}
 
-      {/* Tab switcher */}
+      {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
         {[['closure','bg-red-600','bg-red-400','Penutupan Jalan'],['congestion','bg-orange-500','bg-orange-400','Zona Kemacetan']].map(([tab, act, dot, label]) => (
           <button key={tab} onClick={() => setActiveTab(tab)}
@@ -258,68 +258,81 @@ export default function AdminTraffic() {
         ))}
       </div>
 
-      {/* ══ TAB: CLOSURE ══════════════════════════════════════════════════════ */}
+      {/* ══ CLOSURE ══════════════════════════════════════════════════════════ */}
       {activeTab === 'closure' && (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Form */}
-            <div className="lg:col-span-1" id="closure-form">
-              <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm sticky top-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-bold text-gray-900">{clForm.id ? 'Edit Rekayasa' : 'Tambah Rekayasa Baru'}</h2>
-                    {clForm.id && <p className="text-xs text-blue-600 font-semibold mt-0.5">Mode edit aktif</p>}
-                  </div>
-                  {clForm.id && (
-                    <button onClick={resetCl} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>Batal Edit
-                    </button>
-                  )}
+          {/*
+            Layout: flex row, tinggi FIXED = MAP_HEIGHT
+            - Form kiri: lebar 300px, overflow-y scroll
+            - Map kanan: flex-1, tinggi persis MAP_HEIGHT
+            Keduanya dalam container tinggi MAP_HEIGHT → selalu pas, tidak bocor
+          */}
+          <div id="closure-form" className="flex gap-5 rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white" style={{ height: MAP_HEIGHT }}>
+
+            {/* Form — scroll internal jika konten melebihi tinggi */}
+            <div className="overflow-y-auto p-6 space-y-4 border-r border-gray-100" style={{ width: 300, flexShrink: 0 }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">{clForm.id ? 'Edit Rekayasa' : 'Tambah Rekayasa Baru'}</h2>
+                  {clForm.id && <p className="text-xs text-blue-600 font-semibold mt-0.5">Mode edit aktif</p>}
                 </div>
-
-                <div><Lbl text="Terkait Event" /><Sel value={clForm.event_id} onChange={e=>setClForm({...clForm,event_id:e.target.value})} cls={fcl}><option value="">-- Pilih Event (opsional) --</option>{events.map(ev=><option key={ev.id} value={ev.id}>{ev.name}</option>)}</Sel></div>
-                <div><Lbl text="Tipe Rekayasa" /><Sel value={clForm.type} onChange={e=>setClForm({...clForm,type:e.target.value})} cls={fcl}><option value="CLOSED">CLOSED (Jalan Ditutup)</option><option value="DIVERSION">DIVERSION (Dialihkan)</option></Sel></div>
-                <div><Lbl text="Alasan Rekayasa" /><Inp value={clForm.reason} onChange={e=>setClForm({...clForm,reason:e.target.value})} placeholder="Contoh: Kirab pusaka" cls={fcl} /></div>
-                <div><Lbl text="Waktu Mulai" /><DtIn value={clForm.start_time} onChange={e=>setClForm({...clForm,start_time:e.target.value})} cls={fcl} /></div>
-                <div><Lbl text="Waktu Selesai" /><DtIn value={clForm.end_time} onChange={e=>setClForm({...clForm,end_time:e.target.value})} cls={fcl} /></div>
-
-                <PickerPanel pickA={clPicker.pickA} pickB={clPicker.pickB} edges={clPicker.edges} onDerive={clPicker.derive} onReset={clPicker.reset} accentColor="bg-blue-600" />
-
-                <button onClick={saveClosure} disabled={saving}
-                  className={`w-full px-4 py-3 font-bold text-sm rounded-lg transition ${saving?'bg-gray-300 text-gray-500 cursor-not-allowed':clForm.id?'bg-blue-600 hover:bg-blue-700 text-white':'bg-red-600 hover:bg-red-700 text-white'}`}>
-                  {saving ? 'Menyimpan...' : clForm.id ? '✏️ Update Rekayasa' : '➕ Simpan Rekayasa'}
-                </button>
+                {clForm.id && (
+                  <button onClick={resetCl} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>Batal
+                  </button>
+                )}
               </div>
+
+              <div><Lbl text="Terkait Event" /><Sel value={clForm.event_id} onChange={e=>setClForm({...clForm,event_id:e.target.value})} cls={fcl}><option value="">-- Pilih Event (opsional) --</option>{events.map(ev=><option key={ev.id} value={ev.id}>{ev.name}</option>)}</Sel></div>
+              <div><Lbl text="Tipe Rekayasa" /><Sel value={clForm.type} onChange={e=>setClForm({...clForm,type:e.target.value})} cls={fcl}><option value="CLOSED">CLOSED (Jalan Ditutup)</option><option value="DIVERSION">DIVERSION (Dialihkan)</option></Sel></div>
+              <div><Lbl text="Alasan Rekayasa" /><Inp value={clForm.reason} onChange={e=>setClForm({...clForm,reason:e.target.value})} placeholder="Contoh: Kirab pusaka" cls={fcl} /></div>
+              <div><Lbl text="Waktu Mulai" /><DtIn value={clForm.start_time} onChange={e=>setClForm({...clForm,start_time:e.target.value})} cls={fcl} /></div>
+              <div><Lbl text="Waktu Selesai" /><DtIn value={clForm.end_time} onChange={e=>setClForm({...clForm,end_time:e.target.value})} cls={fcl} /></div>
+
+              <PickerPanel pickA={clPicker.pickA} pickB={clPicker.pickB} edges={clPicker.edges} onDerive={clPicker.derive} onReset={clPicker.reset} accentColor="bg-blue-600" />
+
+              <button onClick={saveClosure} disabled={saving}
+                className={`w-full px-4 py-3 font-bold text-sm rounded-lg transition ${saving?'bg-gray-300 text-gray-500 cursor-not-allowed':clForm.id?'bg-blue-600 hover:bg-blue-700 text-white':'bg-red-600 hover:bg-red-700 text-white'}`}>
+                {saving ? 'Menyimpan...' : clForm.id ? '✏️ Update Rekayasa' : '➕ Simpan Rekayasa'}
+              </button>
             </div>
 
-            {/* Map */}
-            <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            {/* Map — flex-1, tinggi diwarisi dari parent (MAP_HEIGHT) */}
+            <div className="flex-1 flex flex-col min-w-0" style={{ isolation: 'isolate' }}>
+              {/* Map header */}
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
                 <p className="text-sm font-semibold text-gray-700">Peta Rekayasa Lalu Lintas</p>
                 <div className="flex items-center gap-3 text-xs text-gray-500">
-                  <span className="flex items-center gap-1.5"><span className="w-4 h-1.5 bg-red-500 rounded inline-block" />Ditutup</span>
-                  <span className="flex items-center gap-1.5"><span className="w-4 h-1.5 bg-orange-400 rounded inline-block" />Dialihkan</span>
+                  <span className="flex items-center gap-1.5"><span className="w-4 h-1.5 bg-red-500 rounded inline-block"/>Ditutup</span>
+                  <span className="flex items-center gap-1.5"><span className="w-4 h-1.5 bg-orange-400 rounded inline-block"/>Dialihkan</span>
                 </div>
               </div>
-              <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ height: 520, width: '100%' }}>
-                <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <MapPicker onPick={clPicker.onMapClick} />
-                {clPicker.pickA && <Marker position={[clPicker.pickA.lat, clPicker.pickA.lng]}><Popup><b>Titik A</b></Popup></Marker>}
-                {clPicker.pickB && <Marker position={[clPicker.pickB.lat, clPicker.pickB.lng]}><Popup><b>Titik B</b></Popup></Marker>}
-                {clPicker.edges.map((e,i) => <Polyline key={'d'+i} positions={e.polyline.map(p=>[p.lat,p.lng])} pathOptions={{ color: clForm.type==='CLOSED'?'red':'orange', weight:6, opacity:.85 }} />)}
-                {closures.flatMap(c => (c.edges||[]).map((e,i) => (
-                  <Polyline key={c.id+'_'+i} positions={e.polyline.map(p=>[p.lat,p.lng])} pathOptions={{ color:c.type==='CLOSED'?'red':'orange', weight:4, opacity:.6 }}>
-                    <Popup>
-                      <p style={{fontWeight:'bold',marginBottom:4}}>{c.type}</p>
-                      <p style={{fontSize:12,color:'#555',marginBottom:8}}>{c.reason||'—'}</p>
-                      <div style={{display:'flex',gap:6}}>
-                        <button onClick={()=>editClosure(c)} style={{flex:1,padding:'4px 8px',background:'#2563eb',color:'white',border:'none',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>Edit</button>
-                        <button onClick={()=>deleteCl(c)} style={{flex:1,padding:'4px 8px',background:'#dc2626',color:'white',border:'none',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>Hapus</button>
-                      </div>
-                    </Popup>
-                  </Polyline>
-                )))}
-              </MapContainer>
+              {/* MapContainer mengisi sisa tinggi (parent flex-col, ini flex-1) */}
+              <div className="flex-1" style={{ position: 'relative', zIndex: 0, minHeight: 0 }}>
+                <MapContainer
+                  center={DEFAULT_CENTER}
+                  zoom={13}
+                  style={{ position: 'absolute', inset: 0, height: '100%', width: '100%' }}
+                >
+                  <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  <MapPicker onPick={clPicker.onMapClick} />
+                  {clPicker.pickA && <Marker position={[clPicker.pickA.lat, clPicker.pickA.lng]}><Popup><b>Titik A</b></Popup></Marker>}
+                  {clPicker.pickB && <Marker position={[clPicker.pickB.lat, clPicker.pickB.lng]}><Popup><b>Titik B</b></Popup></Marker>}
+                  {clPicker.edges.map((e,i) => <Polyline key={'d'+i} positions={e.polyline.map(p=>[p.lat,p.lng])} pathOptions={{ color: clForm.type==='CLOSED'?'red':'orange', weight:6, opacity:.85 }} />)}
+                  {closures.flatMap(c => (c.edges||[]).map((e,i) => (
+                    <Polyline key={c.id+'_'+i} positions={e.polyline.map(p=>[p.lat,p.lng])} pathOptions={{ color:c.type==='CLOSED'?'red':'orange', weight:4, opacity:.6 }}>
+                      <Popup>
+                        <p style={{fontWeight:'bold',marginBottom:4}}>{c.type}</p>
+                        <p style={{fontSize:12,color:'#555',marginBottom:8}}>{c.reason||'—'}</p>
+                        <div style={{display:'flex',gap:6}}>
+                          <button onClick={()=>editClosure(c)} style={{flex:1,padding:'4px 8px',background:'#2563eb',color:'white',border:'none',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>Edit</button>
+                          <button onClick={()=>deleteCl(c)} style={{flex:1,padding:'4px 8px',background:'#dc2626',color:'white',border:'none',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>Hapus</button>
+                        </div>
+                      </Popup>
+                    </Polyline>
+                  )))}
+                </MapContainer>
+              </div>
             </div>
           </div>
 
@@ -330,7 +343,7 @@ export default function AdminTraffic() {
               <span className="text-xs text-gray-400 font-medium">{closures.length} data</span>
             </div>
             {loading ? (
-              <div className="flex items-center gap-3 text-sm text-gray-400 px-6 py-10 justify-center"><span className="w-4 h-4 border-2 border-gray-200 border-t-red-500 rounded-full animate-spin" />Memuat data...</div>
+              <div className="flex items-center gap-3 text-sm text-gray-400 px-6 py-10 justify-center"><span className="w-4 h-4 border-2 border-gray-200 border-t-red-500 rounded-full animate-spin"/>Memuat data...</div>
             ) : closures.length === 0 ? (
               <div className="px-6 py-12 text-center text-sm text-gray-400">Belum ada rekayasa lalu lintas terdaftar.</div>
             ) : (
@@ -346,7 +359,7 @@ export default function AdminTraffic() {
         </>
       )}
 
-      {/* ══ TAB: CONGESTION ═══════════════════════════════════════════════════ */}
+      {/* ══ CONGESTION ═══════════════════════════════════════════════════════ */}
       {activeTab === 'congestion' && (
         <>
           <div className="mb-6 flex items-start gap-3 px-4 py-3.5 bg-orange-50 border border-orange-200 text-orange-900 rounded-xl text-sm">
@@ -357,72 +370,77 @@ export default function AdminTraffic() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div id="congestion-form" className="flex gap-5 rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white" style={{ height: MAP_HEIGHT }}>
+
             {/* Form */}
-            <div className="lg:col-span-1" id="congestion-form">
-              <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm sticky top-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-bold text-gray-900">{cgForm.id ? 'Edit Kemacetan' : 'Tambah Zona Macet'}</h2>
-                    {cgForm.id && <p className="text-xs text-orange-600 font-semibold mt-0.5">Mode edit aktif</p>}
-                  </div>
-                  {cgForm.id && (
-                    <button onClick={resetCg} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>Batal Edit
-                    </button>
-                  )}
-                </div>
-
-                <div><Lbl text="Terkait Event" /><Sel value={cgForm.event_id} onChange={e=>setCgForm({...cgForm,event_id:e.target.value})} cls={fcg}><option value="">-- Pilih Event (opsional) --</option>{events.map(ev=><option key={ev.id} value={ev.id}>{ev.name}</option>)}</Sel></div>
+            <div className="overflow-y-auto p-6 space-y-4 border-r border-gray-100" style={{ width: 300, flexShrink: 0 }}>
+              <div className="flex items-center justify-between">
                 <div>
-                  <Lbl text="Level Kemacetan" />
-                  <Sel value={cgForm.level} onChange={e=>setCgForm({...cgForm,level:e.target.value})} cls={fcg}>
-                    <option value="MODERATE">MODERATE — Macet Sedang (ETA 2.5×)</option>
-                    <option value="HEAVY">HEAVY — Macet Parah (ETA 5×)</option>
-                  </Sel>
-                  <p className="mt-1 text-[11px] text-gray-400">A* akan menghindari jika ada jalur alternatif lebih cepat.</p>
+                  <h2 className="text-lg font-bold text-gray-900">{cgForm.id ? 'Edit Kemacetan' : 'Tambah Zona Macet'}</h2>
+                  {cgForm.id && <p className="text-xs text-orange-600 font-semibold mt-0.5">Mode edit aktif</p>}
                 </div>
-                <div><Lbl text="Keterangan" /><Inp value={cgForm.reason} onChange={e=>setCgForm({...cgForm,reason:e.target.value})} placeholder="Contoh: Antrian kirab, pasar malam" cls={fcg} /></div>
-                <div><Lbl text="Waktu Mulai" /><DtIn value={cgForm.start_time} onChange={e=>setCgForm({...cgForm,start_time:e.target.value})} cls={fcg} /></div>
-                <div><Lbl text="Waktu Selesai" /><DtIn value={cgForm.end_time} onChange={e=>setCgForm({...cgForm,end_time:e.target.value})} cls={fcg} /></div>
-
-                <PickerPanel pickA={cgPicker.pickA} pickB={cgPicker.pickB} edges={cgPicker.edges} onDerive={cgPicker.derive} onReset={cgPicker.reset} accentColor="bg-orange-500" />
-
-                <button onClick={saveCongestion} disabled={cgSaving}
-                  className={`w-full px-4 py-3 font-bold text-sm rounded-lg transition ${cgSaving?'bg-gray-300 text-gray-500 cursor-not-allowed':cgForm.id?'bg-blue-600 hover:bg-blue-700 text-white':'bg-orange-500 hover:bg-orange-600 text-white'}`}>
-                  {cgSaving ? 'Menyimpan...' : cgForm.id ? '✏️ Update Zona Macet' : '➕ Simpan Zona Macet'}
-                </button>
+                {cgForm.id && (
+                  <button onClick={resetCg} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>Batal
+                  </button>
+                )}
               </div>
+
+              <div><Lbl text="Terkait Event" /><Sel value={cgForm.event_id} onChange={e=>setCgForm({...cgForm,event_id:e.target.value})} cls={fcg}><option value="">-- Pilih Event (opsional) --</option>{events.map(ev=><option key={ev.id} value={ev.id}>{ev.name}</option>)}</Sel></div>
+              <div>
+                <Lbl text="Level Kemacetan" />
+                <Sel value={cgForm.level} onChange={e=>setCgForm({...cgForm,level:e.target.value})} cls={fcg}>
+                  <option value="MODERATE">MODERATE — Macet Sedang (ETA 2.5×)</option>
+                  <option value="HEAVY">HEAVY — Macet Parah (ETA 5×)</option>
+                </Sel>
+                <p className="mt-1 text-[11px] text-gray-400">A* akan menghindari jika ada jalur alternatif lebih cepat.</p>
+              </div>
+              <div><Lbl text="Keterangan" /><Inp value={cgForm.reason} onChange={e=>setCgForm({...cgForm,reason:e.target.value})} placeholder="Contoh: Antrian kirab, pasar malam" cls={fcg} /></div>
+              <div><Lbl text="Waktu Mulai" /><DtIn value={cgForm.start_time} onChange={e=>setCgForm({...cgForm,start_time:e.target.value})} cls={fcg} /></div>
+              <div><Lbl text="Waktu Selesai" /><DtIn value={cgForm.end_time} onChange={e=>setCgForm({...cgForm,end_time:e.target.value})} cls={fcg} /></div>
+
+              <PickerPanel pickA={cgPicker.pickA} pickB={cgPicker.pickB} edges={cgPicker.edges} onDerive={cgPicker.derive} onReset={cgPicker.reset} accentColor="bg-orange-500" />
+
+              <button onClick={saveCongestion} disabled={cgSaving}
+                className={`w-full px-4 py-3 font-bold text-sm rounded-lg transition ${cgSaving?'bg-gray-300 text-gray-500 cursor-not-allowed':cgForm.id?'bg-blue-600 hover:bg-blue-700 text-white':'bg-orange-500 hover:bg-orange-600 text-white'}`}>
+                {cgSaving ? 'Menyimpan...' : cgForm.id ? '✏️ Update Zona Macet' : '➕ Simpan Zona Macet'}
+              </button>
             </div>
 
             {/* Map */}
-            <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex-1 flex flex-col min-w-0" style={{ isolation: 'isolate' }}>
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
                 <p className="text-sm font-semibold text-gray-700">Peta Zona Kemacetan</p>
                 <div className="flex items-center gap-3 text-xs text-gray-500">
-                  <span className="flex items-center gap-1.5"><span className="w-4 h-1.5 bg-orange-400 rounded inline-block" />Macet Sedang</span>
-                  <span className="flex items-center gap-1.5"><span className="w-4 h-1.5 bg-orange-600 rounded inline-block" />Macet Parah</span>
+                  <span className="flex items-center gap-1.5"><span className="w-4 h-1.5 bg-orange-400 rounded inline-block"/>Macet Sedang</span>
+                  <span className="flex items-center gap-1.5"><span className="w-4 h-1.5 bg-orange-600 rounded inline-block"/>Macet Parah</span>
                 </div>
               </div>
-              <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ height: 520, width: '100%' }}>
-                <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <MapPicker onPick={cgPicker.onMapClick} />
-                {cgPicker.pickA && <Marker position={[cgPicker.pickA.lat, cgPicker.pickA.lng]}><Popup><b>Titik A</b></Popup></Marker>}
-                {cgPicker.pickB && <Marker position={[cgPicker.pickB.lat, cgPicker.pickB.lng]}><Popup><b>Titik B</b></Popup></Marker>}
-                {cgPicker.edges.map((e,i) => <Polyline key={'cgd'+i} positions={e.polyline.map(p=>[p.lat,p.lng])} pathOptions={{ color:cgForm.level==='HEAVY'?'#ea580c':'#fb923c', weight:6, opacity:.85, dashArray:'8,4' }} />)}
-                {congestions.flatMap(cg => (cg.edges||[]).map((e,i) => (
-                  <Polyline key={cg.id+'_cg_'+i} positions={e.polyline.map(p=>[p.lat,p.lng])} pathOptions={{ color:cg.level==='HEAVY'?'#ea580c':'#fb923c', weight:5, opacity:.7, dashArray:'8,4' }}>
-                    <Popup>
-                      <p style={{fontWeight:'bold',marginBottom:2}}>🚦 {cg.level==='HEAVY'?'Macet Parah':'Macet Sedang'}</p>
-                      <p style={{fontSize:12,color:'#555',marginBottom:8}}>{cg.reason||'—'}</p>
-                      <div style={{display:'flex',gap:6}}>
-                        <button onClick={()=>editCongestion(cg)} style={{flex:1,padding:'4px 8px',background:'#2563eb',color:'white',border:'none',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>Edit</button>
-                        <button onClick={()=>deleteCg(cg)} style={{flex:1,padding:'4px 8px',background:'#dc2626',color:'white',border:'none',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>Hapus</button>
-                      </div>
-                    </Popup>
-                  </Polyline>
-                )))}
-              </MapContainer>
+              <div className="flex-1" style={{ position: 'relative', zIndex: 0, minHeight: 0 }}>
+                <MapContainer
+                  center={DEFAULT_CENTER}
+                  zoom={13}
+                  style={{ position: 'absolute', inset: 0, height: '100%', width: '100%' }}
+                >
+                  <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  <MapPicker onPick={cgPicker.onMapClick} />
+                  {cgPicker.pickA && <Marker position={[cgPicker.pickA.lat, cgPicker.pickA.lng]}><Popup><b>Titik A</b></Popup></Marker>}
+                  {cgPicker.pickB && <Marker position={[cgPicker.pickB.lat, cgPicker.pickB.lng]}><Popup><b>Titik B</b></Popup></Marker>}
+                  {cgPicker.edges.map((e,i) => <Polyline key={'cgd'+i} positions={e.polyline.map(p=>[p.lat,p.lng])} pathOptions={{ color:cgForm.level==='HEAVY'?'#ea580c':'#fb923c', weight:6, opacity:.85, dashArray:'8,4' }} />)}
+                  {congestions.flatMap(cg => (cg.edges||[]).map((e,i) => (
+                    <Polyline key={cg.id+'_cg_'+i} positions={e.polyline.map(p=>[p.lat,p.lng])} pathOptions={{ color:cg.level==='HEAVY'?'#ea580c':'#fb923c', weight:5, opacity:.7, dashArray:'8,4' }}>
+                      <Popup>
+                        <p style={{fontWeight:'bold',marginBottom:2}}>🚦 {cg.level==='HEAVY'?'Macet Parah':'Macet Sedang'}</p>
+                        <p style={{fontSize:12,color:'#555',marginBottom:8}}>{cg.reason||'—'}</p>
+                        <div style={{display:'flex',gap:6}}>
+                          <button onClick={()=>editCongestion(cg)} style={{flex:1,padding:'4px 8px',background:'#2563eb',color:'white',border:'none',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>Edit</button>
+                          <button onClick={()=>deleteCg(cg)} style={{flex:1,padding:'4px 8px',background:'#dc2626',color:'white',border:'none',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>Hapus</button>
+                        </div>
+                      </Popup>
+                    </Polyline>
+                  )))}
+                </MapContainer>
+              </div>
             </div>
           </div>
 
@@ -433,7 +451,7 @@ export default function AdminTraffic() {
               <span className="text-xs text-gray-400 font-medium">{congestions.length} data</span>
             </div>
             {loadingCong ? (
-              <div className="flex items-center gap-3 text-sm text-gray-400 px-6 py-10 justify-center"><span className="w-4 h-4 border-2 border-gray-200 border-t-orange-500 rounded-full animate-spin" />Memuat data...</div>
+              <div className="flex items-center gap-3 text-sm text-gray-400 px-6 py-10 justify-center"><span className="w-4 h-4 border-2 border-gray-200 border-t-orange-500 rounded-full animate-spin"/>Memuat data...</div>
             ) : congestions.length === 0 ? (
               <div className="px-6 py-12 text-center text-sm text-gray-400">Belum ada zona kemacetan terdaftar.</div>
             ) : (

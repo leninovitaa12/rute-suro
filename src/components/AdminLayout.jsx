@@ -44,7 +44,6 @@ export default function AdminLayout({ children }) {
     },
   ]
 
-  // ── Logout dengan SweetAlert2 ─────────────────────────────────────────────
   async function handleLogout() {
     const result = await Swal.fire({
       icon: 'warning',
@@ -92,6 +91,19 @@ export default function AdminLayout({ children }) {
         .navbar-slide { animation: slideDown 0.4s ease-out; }
         .drop-in      { animation: dropIn 0.18s ease-out; }
 
+        /* ── Kunci: paksa navbar selalu di atas Leaflet (z-index 400-600) ── */
+        .leaflet-pane,
+        .leaflet-top,
+        .leaflet-bottom,
+        .leaflet-control,
+        .leaflet-overlay-pane,
+        .leaflet-tile-pane,
+        .leaflet-marker-pane,
+        .leaflet-popup-pane,
+        .leaflet-shadow-pane { z-index: 1 !important; }
+        .leaflet-tooltip-pane { z-index: 2 !important; }
+        .leaflet-popup-pane   { z-index: 3 !important; }
+
         .nav-link {
           position: relative; display: inline-flex; align-items: center; gap: 6px;
           padding: 6px 14px; border-radius: 8px; font-size: 0.875rem; font-weight: 500;
@@ -122,8 +134,8 @@ export default function AdminLayout({ children }) {
         .dd-item.active { background: #fef2f2; color: #b91c1c; font-weight: 700; border-left: 3px solid #b91c1c; padding-left: 13px; }
       `}</style>
 
-      {/* ── Navbar ── */}
-      <header className="navbar-slide sticky top-0 z-40 bg-red-800 shadow-lg">
+      {/* ── Navbar — z-[9999] agar selalu di atas Leaflet ── */}
+      <header className="navbar-slide sticky top-0 bg-red-800 shadow-lg" style={{ zIndex: 9999 }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 gap-4">
 
@@ -165,7 +177,7 @@ export default function AdminLayout({ children }) {
                   </svg>
                 </button>
                 {contentMenuOpen && (
-                  <div className="drop-in absolute top-[calc(100%+10px)] left-0 w-52 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50">
+                  <div className="drop-in absolute top-[calc(100%+10px)] left-0 w-52 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden" style={{ zIndex: 10000 }}>
                     {contentMenuItems.map((item) => (
                       <Link key={item.path} to={item.path} className={`dd-item ${isActive(item.path) ? 'active' : ''}`}>
                         <span className={isActive(item.path) ? 'text-red-600' : 'text-gray-400'}>{item.icon}</span>
@@ -205,8 +217,8 @@ export default function AdminLayout({ children }) {
         </div>
       </header>
 
-      {/* ── Main Content ── */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+      {/* ── Main Content — isolation:isolate agar Leaflet z-index tidak bocor ── */}
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8" style={{ isolation: 'isolate' }}>
         {children}
       </main>
 

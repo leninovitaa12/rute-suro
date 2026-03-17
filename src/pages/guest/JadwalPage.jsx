@@ -223,7 +223,6 @@ export default function JadwalPage() {
             Jadwal Acara
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3">Jadwal Event Grebeg Suro</h1>
-          <p className="text-lg text-red-100">Semua jadwal diperbarui oleh admin secara langsung.</p>
         </div>
       </section>
 
