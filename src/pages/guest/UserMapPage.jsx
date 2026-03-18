@@ -1,5 +1,5 @@
 import React from 'react'
-import { MapContainer, TileLayer } from 'react-leaflet'
+import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import dayjs from 'dayjs'
 import { api } from '../../lib/api.js'
 import RightDockPanel from '../../components/RightDockPanel.jsx'
@@ -29,6 +29,19 @@ const FOLLOW_FLY_DURATION    = 0.65
 const REVERSE_GEO_TTL_MS     = 24 * 60 * 60 * 1000
 const REVERSE_GEO_TIMEOUT_MS = 9000
 
+// ─── FIX UTAMA: MapRefSetter ──────────────────────────────────────────────────
+// whenCreated sudah DEPRECATED di react-leaflet v4.
+// Komponen kecil ini harus diletakkan DI DALAM <MapContainer>
+// agar bisa akses instance map via useMap() hook.
+// mapRef.current akan terisi segera setelah MapContainer mount.
+function MapRefSetter({ mapRef }) {
+  const map = useMap()
+  React.useEffect(() => {
+    mapRef.current = map
+  }, [map, mapRef])
+  return null
+}
+
 // ─── Small reusable panel components ─────────────────────────────────────────
 const SBtn = ({ onClick, disabled, cls, children }) => (
   <button onClick={onClick} disabled={disabled}
@@ -44,7 +57,6 @@ const LoadDot = ({ loading, label, doneLabel }) => (
   </p>
 )
 
-// Legend row: mendukung children custom (untuk ikon P, img marker, dsb)
 const LegendRow = ({ color, style, label, children }) => (
   <div className="flex items-center gap-2 text-xs text-[#2B3440] font-semibold ml-9 mt-1">
     <span className="inline-flex items-center gap-1.5">
@@ -98,7 +110,7 @@ export default function UserMapPage() {
   // ── Refs ───────────────────────────────────────────────────────────────────
   const lastPosRef         = React.useRef(null)
   const lastSpokenStepRef  = React.useRef({ idx: -1, ts: 0 })
-  const mapRef             = React.useRef(null)
+  const mapRef             = React.useRef(null)  // diisi oleh MapRefSetter
   const watchIdRef         = React.useRef(null)
   const closuresCacheRef   = React.useRef({ data: null, fetchedAt: 0 })
   const lastStreetFetchRef = React.useRef(0)
@@ -117,6 +129,7 @@ export default function UserMapPage() {
   const startLabel    = startAddr || (start ? `${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}` : null)
   const endLabel      = endAddr   || (end   ? `${end.lat.toFixed(5)}, ${end.lng.toFixed(5)}`     : null)
   const canFindRoute  = !!start && !!end
+  const hasCongestion = congestionZones.length > 0
 
   const spotsForSelectedEvent = React.useMemo(
     () => parkingSpots.filter(s => String(s.event_id) === String(selectedEventId)),
@@ -242,7 +255,6 @@ export default function UserMapPage() {
       if (chosen) { setSteps(Array.isArray(chosen.steps) ? chosen.steps : []); setStepIdx(0) }
       if (!silent) setMsg(`Rute ditemukan. Estimasi ${chosen?.total_time_sec ? (chosen.total_time_sec / 60).toFixed(1) : '?'} menit. Pilih alternatif rute.`)
       await refreshClosures({ force: true, silent: true })
-      // Fly kamera ke titik awal setelah rute ditemukan
       if (mapRef.current && s) setTimeout(() => mapRef.current?.flyTo([s.lat, s.lng], 16, { animate: true, duration: 1.2 }), 350)
     } catch (e2) {
       if (!silent) setMsg('Gagal: ' + (e2?.response?.data?.error || e2.message))
@@ -284,24 +296,52 @@ export default function UserMapPage() {
     if (!navigator.geolocation) return setGeoErr('Browser tidak mendukung Geolocation.')
     if (watchIdRef.current != null) return
     lastPosRef.current = null
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      pos => {
-        const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-        setMyPos(pt)
-        if (Number.isFinite(pos.coords.heading) && pos.coords.heading != null)
-          setBearing((pos.coords.heading + 360) % 360)
-        else if (lastPosRef.current) setBearing(bearingDeg(lastPosRef.current, pt))
-        lastPosRef.current = pt
-        if (followMe && mapRef.current) {
-          const z = tracking ? Math.max(mapRef.current.getZoom(), FOLLOW_ZOOM) : mapRef.current.getZoom()
-          mapRef.current.flyTo([pt.lat, pt.lng], z, { animate: true, duration: FOLLOW_FLY_DURATION })
+
+    // ── FIX: Gunakan getCurrentPosition dulu untuk dapat posisi GPS aktual,
+    // lalu fly kamera ke sana SEBELUM watchPosition dimulai.
+    // Ini mengatasi dua masalah sekaligus:
+    //   1. mapRef.current sudah pasti terisi (via MapRefSetter)
+    //   2. Fly ke posisi GPS nyata, bukan ke titik yang diklik di peta
+    navigator.geolocation.getCurrentPosition(
+      firstPos => {
+        const firstPt = { lat: firstPos.coords.latitude, lng: firstPos.coords.longitude }
+        setMyPos(firstPt)
+
+        // Fly kamera ke posisi GPS aktual user
+        if (mapRef.current) {
+          mapRef.current.flyTo([firstPt.lat, firstPt.lng], FOLLOW_ZOOM, {
+            animate: true,
+            duration: 1.5,
+          })
         }
+
+        // Mulai watch setelah dapat posisi pertama
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          pos => {
+            const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+            setMyPos(pt)
+            if (Number.isFinite(pos.coords.heading) && pos.coords.heading != null)
+              setBearing((pos.coords.heading + 360) % 360)
+            else if (lastPosRef.current) setBearing(bearingDeg(lastPosRef.current, pt))
+            lastPosRef.current = pt
+            if (followMe && mapRef.current) {
+              mapRef.current.flyTo([pt.lat, pt.lng], FOLLOW_ZOOM, {
+                animate: true,
+                duration: FOLLOW_FLY_DURATION,
+              })
+            }
+          },
+          err => setGeoErr(err.message || 'Navigasi gagal (GPS).'),
+          { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 }
+        )
+        setTracking(true)
+        setMsg('Navigasi aktif. Jika melenceng dari rute, sistem akan hitung ulang otomatis.')
       },
-      err => setGeoErr(err.message || 'Navigasi gagal (GPS).'),
-      { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 }
+      err => {
+        setGeoErr(err.message || 'Gagal mendapatkan posisi GPS.')
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     )
-    setTracking(true)
-    setMsg('Navigasi aktif. Jika melenceng dari rute, sistem akan hitung ulang otomatis.')
   }
 
   function stopTracking() {
@@ -567,6 +607,16 @@ export default function UserMapPage() {
                     </div>
                     <p className={`text-xs font-bold ${selectedMode === key ? 'text-white' : 'text-[#2B3440]'}`}>{fmtMin(route?.total_time_sec)}</p>
                     <p className={`text-[10px] font-semibold ${selectedMode === key ? 'text-white/75' : 'text-[#6B6560]'}`}>{fmtKm(route?.total_length_m)}</p>
+                    {hasCongestion && key === 'fastest' && (
+                      <p className={`text-[9px] mt-1 font-bold ${selectedMode === key ? 'text-emerald-300' : 'text-emerald-600'}`}>
+                        ✓ hindari {congestionZones.length} zona macet
+                      </p>
+                    )}
+                    {hasCongestion && key === 'shortest' && (
+                      <p className={`text-[9px] mt-1 font-bold ${selectedMode === key ? 'text-orange-300' : 'text-orange-500'}`}>
+                        ⚠ abaikan kemacetan
+                      </p>
+                    )}
                   </button>
                 ))}
               </div>
@@ -586,16 +636,13 @@ export default function UserMapPage() {
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#8b1a1a] text-white"><IconAlertTriangle className="w-3.5 h-3.5" /></span>
               <p className="text-xs font-extrabold text-[#2B3440] uppercase tracking-wide">Informasi Peta</p>
             </div>
-            {/* Jalan ditutup */}
             <LegendRow color="#dc2626" label="Jalan ditutup (rekayasa)" />
-            {/* Macet sedang — 2 garis tipis oranye */}
             <LegendRow label="Macet sedang (2 garis oranye)">
               <span className="inline-flex flex-col gap-[2.5px]">
                 <span className="inline-block w-4 h-[2.5px] bg-orange-500 rounded-sm" />
                 <span className="inline-block w-4 h-[2.5px] bg-orange-500 rounded-sm" />
               </span>
             </LegendRow>
-            {/* Macet parah — 2 garis tipis merah */}
             <LegendRow label="Macet parah (2 garis merah)">
               <span className="inline-flex flex-col gap-[2.5px]">
                 <span className="inline-block w-4 h-[2.5px] bg-red-600 rounded-sm" />
@@ -626,8 +673,9 @@ export default function UserMapPage() {
         </RightDockPanel>
 
         {/* ── Map ── */}
-        <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ height: '100%', width: '100%' }}
-          whenCreated={map => { mapRef.current = map }}>
+        <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ height: '100%', width: '100%' }}>
+          {/* FIX: MapRefSetter menggantikan whenCreated yang deprecated di react-leaflet v4 */}
+          <MapRefSetter mapRef={mapRef} />
           <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           <ClickSetter mode={pickMode} onPick={onPick} />
           <MapLayers

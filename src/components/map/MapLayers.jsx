@@ -38,39 +38,75 @@ function SelectedBadge({ color = '#b91c1c', label }) {
 }
 
 // ─── CongestionLines ──────────────────────────────────────────────────────────
-// Warna ORANGE GELAP agar jelas terlihat di atas peta maupun rute biru.
-// Dibedakan dari closure (merah solid) via dashArray putus-putus.
-//   MODERATE → orange gelap  #c2410c  putus renggang  14, 7
-//   HEAVY    → orange merah  #9a3412  putus rapat      8, 5
+// Mendukung DUA format data edge:
+//   Format A (dari admin manual): edge punya { polyline: [{lat, lng}, ...] }
+//   Format B (dari traffic_sync.py TomTom): edge hanya punya { u, v, lat?, lng? }
+//     → pada format B, kita gunakan titik tengah (lat/lng) sebagai titik tunggal
+//       dan render CircleMarker kecil sebagai penanda zona macet.
+//
+// MODERATE → orange gelap  #c2410c  putus renggang  14, 7
+// HEAVY    → orange merah  #9a3412  putus rapat      8, 5
 
 function CongestionLines({ cz }) {
   const heavy     = (cz.level || 'MODERATE') === 'HEAVY'
-  const color     = heavy ? '#9a3412' : '#c2410c'   // orange-700 / orange-900
+  const color     = heavy ? '#9a3412' : '#c2410c'
   const dashArray = heavy ? '8, 5' : '14, 7'
   const label     = heavy ? 'Macet Parah' : 'Macet Sedang'
   const eta       = heavy ? 'ETA ~5× lebih lambat' : 'ETA ~2.5× lebih lambat'
 
+  const tooltipContent = (
+    <div style={{ minWidth: 150 }}>
+      <p style={{ fontWeight: 'bold', color, marginBottom: 2 }}>🚦 {label}</p>
+      {cz.reason && <p style={{ fontSize: 11, color: '#555', marginBottom: 1 }}>{cz.reason}</p>}
+      <p style={{ fontSize: 11, color: '#888' }}>{eta}</p>
+    </div>
+  )
+
+  // Kumpulkan edge yang punya polyline (format A) dan yang tidak (format B)
+  const polylineEdges = []
+  const dotEdges      = []
+
+  ;(cz.edges || []).forEach((e, ei) => {
+    const pts = (e.polyline || []).filter(p => p?.lat && p?.lng).map(p => [p.lat, p.lng])
+    if (pts.length >= 2) {
+      polylineEdges.push({ pts, ei })
+    } else if (e.lat != null && e.lng != null) {
+      // Format B: hanya ada koordinat titik tengah
+      dotEdges.push({ lat: e.lat, lng: e.lng, ei })
+    }
+    // Jika tidak ada sama sekali, skip (edge tanpa koordinat)
+  })
+
   return (
     <>
-      {(cz.edges || []).map((e, ei) => {
-        const pts = (e.polyline || []).filter(p => p.lat && p.lng).map(p => [p.lat, p.lng])
-        if (pts.length < 2) return null
-        return (
-          <Polyline
-            key={`cg_${cz.id}_${ei}`}
-            positions={pts}
-            pathOptions={{ color, weight: 6, opacity: 1, dashArray }}
-          >
-            <Tooltip sticky direction="top">
-              <div style={{ minWidth: 150 }}>
-                <p style={{ fontWeight: 'bold', color, marginBottom: 2 }}>🚦 {label}</p>
-                {cz.reason && <p style={{ fontSize: 11, color: '#555', marginBottom: 1 }}>{cz.reason}</p>}
-                <p style={{ fontSize: 11, color: '#888' }}>{eta}</p>
-              </div>
-            </Tooltip>
-          </Polyline>
-        )
-      })}
+      {/* Format A — Polyline putus-putus */}
+      {polylineEdges.map(({ pts, ei }) => (
+        <Polyline
+          key={`cg_${cz.id}_line_${ei}`}
+          positions={pts}
+          pathOptions={{ color, weight: 6, opacity: 1, dashArray }}
+        >
+          <Tooltip sticky direction="top">{tooltipContent}</Tooltip>
+        </Polyline>
+      ))}
+
+      {/* Format B — CircleMarker titik tengah (dari traffic_sync.py) */}
+      {dotEdges.map(({ lat, lng, ei }) => (
+        <CircleMarker
+          key={`cg_${cz.id}_dot_${ei}`}
+          center={[lat, lng]}
+          radius={heavy ? 7 : 5}
+          pathOptions={{
+            color,
+            fillColor: color,
+            fillOpacity: 0.7,
+            weight: 2,
+            opacity: 1,
+          }}
+        >
+          <Tooltip sticky direction="top">{tooltipContent}</Tooltip>
+        </CircleMarker>
+      ))}
     </>
   )
 }
@@ -177,12 +213,12 @@ export default function MapLayers({
         )
       })}
 
-      {/* 2.  Congestion — orange gelap putus-putus, di atas rute biru */}
+      {/* 2. Congestion — orange gelap putus-putus / titik, di atas rute biru */}
       {Array.isArray(congestionZones) && congestionZones.map((cz) => (
         <CongestionLines key={`cz_${cz.id}`} cz={cz} />
       ))}
 
-      {/* 3.  Closure — merah solid, paling atas */}
+      {/* 3. Closure — merah solid, paling atas */}
       {closures.map((c) => {
         const positions = (c.edges || [])
           .map(e => Array.isArray(e.polyline) ? e.polyline.map(p => [p.lat, p.lng]) : null)
