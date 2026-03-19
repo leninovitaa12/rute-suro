@@ -1,0 +1,107 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [111.4625, -7.8728],
+          [111.4633, -7.8720],
+          [111.4641, -7.8712],
+          [111.4649, -7.8704]
+        ]
+      },
+      "properties": {
+        "name": "Jalan Ahmad Yani",
+        "highway": "residential",
+        "ref": ""
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [111.4649, -7.8704],
+          [111.4657, -7.8696],
+          [111.4665, -7.8688],
+          [111.4673, -7.8680]
+        ]
+      },
+      "properties": {
+        "name": "Jalan Merdeka",
+        "highway": "secondary",
+        "ref": ""
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [111.4625, -7.8728],
+          [111.4625, -7.8736],
+          [111.4625, -7.8744],
+          [111.4625, -7.8752]
+        ]
+      },
+      "properties": {
+        "name": "Jalan Soekarno",
+        "highway": "tertiary",
+        "ref": ""
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [111.4617, -7.8728],
+          [111.4625, -7.8728],
+          [111.4633, -7.8728],
+          [111.4641, -7.8728]
+        ]
+      },
+      "properties": {
+        "name": "Jalan Diponegoro",
+        "highway": "residential",
+        "ref": ""
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [111.4673, -7.8680],
+          [111.4681, -7.8672],
+          [111.4689, -7.8664],
+          [111.4697, -7.8656]
+        ]
+      },
+      "properties": {
+        "name": "Jalan Sudirman",
+        "highway": "primary",
+        "ref": "RD-1"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [111.4625, -7.8752],
+          [111.4633, -7.8760],
+          [111.4641, -7.8768],
+          [111.4649, -7.8776]
+        ]
+      },
+      "properties": {
+        "name": "Jalan Gatot Subroto",
+        "highway": "secondary",
+        "ref": ""
+      }
+    }
+  ]
+}
