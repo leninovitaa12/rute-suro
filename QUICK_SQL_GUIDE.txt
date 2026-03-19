@@ -1,0 +1,184 @@
+================================================================================
+                    🎯 RUTE SURO - SQL EXECUTION GUIDE
+================================================================================
+
+PERTANYAAN ANDA: "Apakah setiap SAMPLE DATA INSERTION harus mengrunning query baru?"
+
+JAWABAN: TIDAK SEKALIGUS! 
+         Jalankan 3 QUERY TERPISAH dalam URUTAN SPESIFIK!
+
+================================================================================
+                            ⚠️ JANGAN LAKUKAN
+================================================================================
+
+❌ SALAH - Jangan copy-paste 1 file besar yang isinya tabel + data sekaligus!
+
+Hasilnya: ERROR karena tabel belum dibuat saat mencoba insert data
+
+================================================================================
+                            ✅ YANG BENAR
+================================================================================
+
+Jalankan 3 file SQL TERPISAH dalam URUTAN INI:
+
+    QUERY 1: sql/00_SCHEMA_COMPLETE_FIXED.sql
+        ↓ TUNGGU SELESAI
+    QUERY 2: sql/10_ADMIN_USER_SETUP.sql  
+        ↓ TUNGGU SELESAI
+    QUERY 3: sql/11_SAMPLE_DATA.sql (OPTIONAL)
+
+================================================================================
+                        DETAIL SETIAP QUERY
+================================================================================
+
+QUERY 1: 00_SCHEMA_COMPLETE_FIXED.sql
+─────────────────────────────────────
+Baris: 310 lines
+Waktu: ~1 menit
+
+Dibuat:
+  ✅ 8 tables (profiles, events, closures, dll)
+  ✅ 2 functions (handle_new_user, is_admin)
+  ✅ 2 triggers
+  ✅ 20+ RLS policies
+  ✅ 25+ indexes
+  ✅ 2 views
+
+Keharusan: WAJIB PERTAMA
+Diulang?: Cukup 1x, aman jika diulang (IF NOT EXISTS)
+
+─────────────────────────────────────────────────────────────────────────────
+
+QUERY 2: 10_ADMIN_USER_SETUP.sql
+─────────────────────────────────────
+Baris: 29 lines
+Waktu: ~10 detik
+
+Dibuat:
+  ✅ INSERT admin user ke profiles table
+  ✅ SET role = 'admin'
+  ✅ SELECT verification
+
+Keharusan: WAJIB KEDUA (admin user harus ada di Auth dulu!)
+Diulang?: Aman jika diulang (ON CONFLICT)
+
+─────────────────────────────────────────────────────────────────────────────
+
+QUERY 3: 11_SAMPLE_DATA.sql
+─────────────────────────────────────
+Baris: 229 lines
+Waktu: ~10 detik
+
+Dibuat:
+  ✅ 2 sample events (Hardiknas, Pameran)
+  ✅ 1 sample closure
+  ✅ 2 sample congestion zones
+  ✅ 2 sample parking spots
+  ✅ 3 sample information pages
+
+Keharusan: OPSIONAL (untuk testing saja)
+Diulang?: Aman jika diulang (ON CONFLICT)
+
+================================================================================
+                      CARA MENJALANKAN DI SUPABASE
+================================================================================
+
+STEP A: Buka Supabase Dashboard > SQL Editor
+
+STEP B: Click "+" untuk query baru
+
+STEP C: Copy-paste QUERY 1 (00_SCHEMA_COMPLETE_FIXED.sql)
+        ↓
+        Click "Run" atau Ctrl+Enter
+        ↓
+        TUNGGU sampai selesai (lihat checkmark ✓ di bawah)
+
+STEP D: Copy-paste QUERY 2 (10_ADMIN_USER_SETUP.sql)
+        ↓
+        Click "Run"
+        ↓
+        TUNGGU sampai selesai
+        ↓
+        Verifikasi: harusnya ada 1 baris hasil dengan admin email
+
+STEP E: (OPTIONAL) Copy-paste QUERY 3 (11_SAMPLE_DATA.sql)
+        ↓
+        Click "Run"
+        ↓
+        TUNGGU sampai selesai
+
+================================================================================
+                        TIMELINE EKSEKUSI
+================================================================================
+
+QUERY 1: ~1 menit
+QUERY 2: ~10 detik
+QUERY 3: ~10 detik (optional)
+─────────────────
+TOTAL:   ~1.5 menit (untuk setup lengkap)
+
+================================================================================
+                      TROUBLESHOOTING
+================================================================================
+
+ERROR: "Table already exists"
+SOLUSI: NORMAL! Ini karena "IF NOT EXISTS". Lanjut ke next step.
+
+ERROR: "Column 'status' does not exist"
+SOLUSI: QUERY 1 tidak selesai dengan benar!
+        - Cek apakah ada error merah saat menjalankan QUERY 1
+        - Pastikan tabel 'events' sudah ada di Tables tab
+        - Jalankan ulang QUERY 1
+
+ERROR: "Auth user not found" / "Admin user not found"
+SOLUSI: Admin user belum dibuat di Supabase Auth!
+        - Buka Supabase Dashboard
+        - Click "Authentication" > "Users"
+        - Click "+ Create new user"
+        - Email: admin@rutesuro.com
+        - Password: (set yourself)
+        - Check "Auto confirm user"
+        - Click "Create user"
+        - THEN jalankan QUERY 2
+
+ERROR: "Permission denied" saat insert
+SOLUSI: Admin user tidak memiliki role 'admin'
+        - Pastikan QUERY 2 sudah dijalankan
+        - Cek hasil SELECT di QUERY 2 (harus ada admin@rutesuro.com dengan role='admin')
+
+================================================================================
+                    FILE LOCATION
+================================================================================
+
+Semua file ada di: /vercel/share/v0-project/backend/sql/
+
+00_SCHEMA_COMPLETE_FIXED.sql  ← Copy-paste content ke Supabase SQL Editor
+10_ADMIN_USER_SETUP.sql       ← Copy-paste content ke Supabase SQL Editor
+11_SAMPLE_DATA.sql            ← Copy-paste content ke Supabase SQL Editor
+
+================================================================================
+                    NEXT STEPS SETELAH SQL SETUP
+================================================================================
+
+1. ✅ SQL Setup selesai (Anda di sini)
+
+2. Backend Setup
+   - Edit backend/.env dengan Supabase URL & Key
+   - Install dependencies: pip install -r requirements.txt
+   - Run backend: python main.py
+
+3. Frontend Setup
+   - Backend sudah berjalan di localhost:8000
+   - Frontend sudah setting API URL ke localhost:8000
+   - Run frontend: npm run dev
+
+4. Testing
+   - Test API dengan test_api.py
+   - Test Frontend dengan membuat event baru
+   - Test Maps dengan mencoba calculate route
+
+================================================================================
+                          DONE! 🎉
+================================================================================
+
+File sudah siap, ikuti urutan di atas, tidak ada masalah!
