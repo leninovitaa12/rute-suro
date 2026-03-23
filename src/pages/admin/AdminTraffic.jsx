@@ -3,8 +3,33 @@ import dayjs from 'dayjs'
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import Swal from 'sweetalert2'
-import { getClosures, getEvents, deriveEdges, createClosure, updateClosure, deleteClosure } from '../../lib/backendApi'
 import { api } from '../../lib/api'
+
+// ── API helpers — FastAPI endpoints ──────────────────────────────────────────
+const getClosures = async (active = false) => {
+  const { data } = await api.get('/road-closures' + (active ? '?active=true' : ''))
+  return data
+}
+const getEvents = async () => {
+  const { data } = await api.get('/events')
+  return data
+}
+const deriveEdges = async (latA, lngA, latB, lngB) => {
+  const { data } = await api.post('/admin/derive-edges', { a: { lat: latA, lng: lngA }, b: { lat: latB, lng: lngB } })
+  return data
+}
+const createClosure = async (body) => {
+  const { data } = await api.post('/road-closures', body)
+  return data
+}
+const updateClosure = async (id, body) => {
+  const { data } = await api.put('/road-closures/' + id, body)
+  return data
+}
+const deleteClosure = async (id) => {
+  const { data } = await api.delete('/road-closures/' + id)
+  return data
+}
 
 const DEFAULT_CENTER = [-7.871, 111.462]
 
@@ -152,7 +177,7 @@ export default function AdminTraffic() {
   }, [])
 
   useEffect(() => {
-    api.get('/congestion_zones')
+    api.get('/congestion-zones')
       .then(r => setCongestions(r.data || []))
       .catch(() => setCongestions([]))
       .finally(() => setLoadingCong(false))
@@ -202,11 +227,11 @@ export default function AdminTraffic() {
     const p = { event_id: cgForm.event_id||null, level: cgForm.level, reason: cgForm.reason||null, start_time: toIso(cgForm.start_time), end_time: toIso(cgForm.end_time), edges: cgPicker.edges }
     try {
       if (cgForm.id) {
-        const r = await api.put(`/congestion_zones/${cgForm.id}`, p)
+        const r = await api.put(`/congestion-zones/${cgForm.id}`, p)
         setCongestions(prev => prev.map(c => c.id === cgForm.id ? r.data : c))
         await swalOK('Berhasil Diperbarui!', 'Zona kemacetan diperbarui.')
       } else {
-        const r = await api.post('/congestion_zones', p)
+        const r = await api.post('/congestion-zones', p)
         setCongestions(prev => [r.data, ...prev])
         await swalOK('Berhasil Disimpan!', 'Zona kemacetan ditambahkan.')
       }
@@ -224,7 +249,7 @@ export default function AdminTraffic() {
   const deleteCg = async cg => {
     const r = await swalDel(cg.reason || cg.level)
     if (!r.isConfirmed) return
-    try { await api.delete(`/congestion_zones/${cg.id}`); setCongestions(p => p.filter(x => x.id !== cg.id)); await swalOK('Berhasil Dihapus!', '') }
+    try { await api.delete(`/congestion-zones/${cg.id}`); setCongestions(p => p.filter(x => x.id !== cg.id)); await swalOK('Berhasil Dihapus!', '') }
     catch (e) { swalErr('Gagal Menghapus', e?.message) }
   }
 

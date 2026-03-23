@@ -54,11 +54,25 @@ function CongestionLines({ cz }) {
   const label     = heavy ? 'Macet Parah' : 'Macet Sedang'
   const eta       = heavy ? 'ETA ~5× lebih lambat' : 'ETA ~2.5× lebih lambat'
 
+  // ── TAMBAHAN: badge sumber data (TomTom live vs manual admin) ────────────
+  const isLive   = (cz.source || 'manual') === 'tomtom'
+  const srcBadge = isLive
+    ? <span style={{ fontSize: 10, fontWeight: 700, background: '#fef3c7', color: '#92400e', borderRadius: 4, padding: '1px 5px', marginLeft: 4 }}>🔴 LIVE</span>
+    : <span style={{ fontSize: 10, fontWeight: 700, background: '#f3f4f6', color: '#6b7280', borderRadius: 4, padding: '1px 5px', marginLeft: 4 }}>MANUAL</span>
+
   const tooltipContent = (
-    <div style={{ minWidth: 150 }}>
-      <p style={{ fontWeight: 'bold', color, marginBottom: 2 }}>🚦 {label}</p>
+    <div style={{ minWidth: 170 }}>
+      <p style={{ fontWeight: 'bold', color, marginBottom: 2, display: 'flex', alignItems: 'center' }}>
+        🚦 {label}{srcBadge}
+      </p>
       {cz.reason && <p style={{ fontSize: 11, color: '#555', marginBottom: 1 }}>{cz.reason}</p>}
       <p style={{ fontSize: 11, color: '#888' }}>{eta}</p>
+      {/* TAMBAHAN: label data real-time jika dari TomTom */}
+      {isLive && (
+        <p style={{ fontSize: 10, color: '#d97706', marginTop: 2, fontWeight: 600 }}>
+          📡 Data TomTom real-time
+        </p>
+      )}
     </div>
   )
 
@@ -73,41 +87,98 @@ function CongestionLines({ cz }) {
     } else if (e.lat != null && e.lng != null) {
       // Format B: hanya ada koordinat titik tengah
       dotEdges.push({ lat: e.lat, lng: e.lng, ei })
+    } else if (e.polyline?.length === 1) {
+      // ── TAMBAHAN: Format TomTom sync — polyline berisi 1 titik saja
+      const p = e.polyline[0]
+      if (p?.lat && p?.lng) dotEdges.push({ lat: p.lat, lng: p.lng, ei })
     }
-    // Jika tidak ada sama sekali, skip (edge tanpa koordinat)
   })
 
   return (
     <>
       {/* Format A — Polyline putus-putus */}
       {polylineEdges.map(({ pts, ei }) => (
-        <Polyline
-          key={`cg_${cz.id}_line_${ei}`}
-          positions={pts}
-          pathOptions={{ color, weight: 6, opacity: 1, dashArray }}
-        >
-          <Tooltip sticky direction="top">{tooltipContent}</Tooltip>
-        </Polyline>
+        <React.Fragment key={`cg_${cz.id}_line_${ei}`}>
+          {/* TAMBAHAN: shadow/halo di belakang polyline agar lebih terlihat */}
+          <Polyline
+            positions={pts}
+            pathOptions={{ color: heavy ? '#450a0a' : '#431407', weight: 12, opacity: 0.18 }}
+          />
+          <Polyline
+            positions={pts}
+            pathOptions={{ color, weight: 6, opacity: 1, dashArray }}
+          >
+            <Tooltip sticky direction="top">{tooltipContent}</Tooltip>
+          </Polyline>
+        </React.Fragment>
       ))}
 
-      {/* Format B — CircleMarker titik tengah (dari traffic_sync.py) */}
+      {/* Format B — CircleMarker titik tengah (dari TomTom sync 1 titik) */}
       {dotEdges.map(({ lat, lng, ei }) => (
-        <CircleMarker
-          key={`cg_${cz.id}_dot_${ei}`}
-          center={[lat, lng]}
-          radius={heavy ? 7 : 5}
-          pathOptions={{
-            color,
-            fillColor: color,
-            fillOpacity: 0.7,
-            weight: 2,
-            opacity: 1,
-          }}
-        >
-          <Tooltip sticky direction="top">{tooltipContent}</Tooltip>
-        </CircleMarker>
+        <React.Fragment key={`cg_${cz.id}_dot_${ei}`}>
+          {/* TAMBAHAN: ring luar agar lebih mencolok */}
+          <CircleMarker
+            center={[lat, lng]}
+            radius={heavy ? 14 : 11}
+            pathOptions={{ color, fillColor: color, fillOpacity: 0.15, weight: 2, opacity: 0.5 }}
+          />
+          <CircleMarker
+            center={[lat, lng]}
+            radius={heavy ? 7 : 5}
+            pathOptions={{ color, fillColor: color, fillOpacity: 0.75, weight: 2, opacity: 1 }}
+          >
+            <Tooltip sticky direction="top">{tooltipContent}</Tooltip>
+          </CircleMarker>
+        </React.Fragment>
       ))}
     </>
+  )
+}
+
+// ── TAMBAHAN: TrafficDelaySummary — badge info kemacetan di sudut kiri bawah peta
+// Muncul otomatis saat ada congestionZones aktif
+// Props: congestionZones (array), activeRoute (object dari routes[selectedMode])
+export function TrafficDelaySummary({ congestionZones, activeRoute }) {
+  const activeCong    = (congestionZones || []).filter(cz => cz.is_active !== false)
+  const heavyCount    = activeCong.filter(c => c.level === 'HEAVY').length
+  const moderateCount = activeCong.filter(c => c.level === 'MODERATE').length
+  const delayS        = activeRoute?.traffic_delay_s || 0
+  const delayMin      = Math.round(delayS / 60)
+
+  if (activeCong.length === 0) return null
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: 90, left: 12, zIndex: 900,
+      background: 'rgba(255,255,255,0.96)', borderRadius: 12,
+      boxShadow: '0 2px 12px rgba(0,0,0,0.18)',
+      border: '1.5px solid #fed7aa',
+      padding: '8px 12px', minWidth: 175,
+      backdropFilter: 'blur(6px)',
+    }}>
+      <p style={{ fontWeight: 800, fontSize: 12, color: '#9a3412', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
+        🚦 Info Kemacetan
+        <span style={{ fontSize: 10, background: '#fef3c7', color: '#92400e', borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>LIVE</span>
+      </p>
+      {heavyCount > 0 && (
+        <p style={{ fontSize: 11, color: '#9a3412', fontWeight: 700, marginBottom: 2 }}>
+          🔴 {heavyCount} zona macet parah
+        </p>
+      )}
+      {moderateCount > 0 && (
+        <p style={{ fontSize: 11, color: '#c2410c', fontWeight: 700, marginBottom: 2 }}>
+          🟠 {moderateCount} zona macet sedang
+        </p>
+      )}
+      {delayMin > 0 && (
+        <p style={{ fontSize: 11, color: '#d97706', fontWeight: 700, borderTop: '1px solid #fed7aa', paddingTop: 4, marginTop: 2 }}>
+          ⏱ Delay: +{delayMin} menit
+        </p>
+      )}
+      <p style={{ fontSize: 10, color: '#9ca3af', marginTop: 3 }}>
+        Rute sudah menghindari kemacetan
+      </p>
+    </div>
   )
 }
 
@@ -125,8 +196,14 @@ export default function MapLayers({
     { key: 'shortest', route: routes.shortest, activeColor: '#38bdf8', tooltip: 'Terpendek' },
   ]
 
+  // ── TAMBAHAN: active route untuk TrafficDelaySummary ─────────────────────
+  const activeRoute = routes?.[selectedMode] || null
+
   return (
     <>
+      {/* ── TAMBAHAN: Badge kemacetan di kiri bawah peta ─────────────────────── */}
+      <TrafficDelaySummary congestionZones={congestionZones} activeRoute={activeRoute} />
+
       {/* Posisi user */}
       {myPos && (
         <>
@@ -208,7 +285,15 @@ export default function MapLayers({
               dashArray: isActive ? undefined : '10 8',
             }}
           >
-            <Tooltip sticky>{tooltip} • {fmtMin(route.total_time_sec)} • {fmtKm(route.total_length_m)}</Tooltip>
+            <Tooltip sticky>
+              {tooltip} • {fmtMin(route.total_time_sec)} • {fmtKm(route.total_length_m)}
+              {/* TAMBAHAN: delay label di tooltip rute */}
+              {(route.traffic_delay_s || 0) > 60 && (
+                <span style={{ color: '#d97706', fontWeight: 700, marginLeft: 6 }}>
+                  (+{Math.round(route.traffic_delay_s / 60)} mnt delay macet)
+                </span>
+              )}
+            </Tooltip>
           </Polyline>
         )
       })}

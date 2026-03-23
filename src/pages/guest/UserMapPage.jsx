@@ -29,16 +29,10 @@ const FOLLOW_FLY_DURATION    = 0.65
 const REVERSE_GEO_TTL_MS     = 24 * 60 * 60 * 1000
 const REVERSE_GEO_TIMEOUT_MS = 9000
 
-// ─── FIX UTAMA: MapRefSetter ──────────────────────────────────────────────────
-// whenCreated sudah DEPRECATED di react-leaflet v4.
-// Komponen kecil ini harus diletakkan DI DALAM <MapContainer>
-// agar bisa akses instance map via useMap() hook.
-// mapRef.current akan terisi segera setelah MapContainer mount.
+// ─── MapRefSetter ─────────────────────────────────────────────────────────────
 function MapRefSetter({ mapRef }) {
   const map = useMap()
-  React.useEffect(() => {
-    mapRef.current = map
-  }, [map, mapRef])
+  React.useEffect(() => { mapRef.current = map }, [map, mapRef])
   return null
 }
 
@@ -110,7 +104,7 @@ export default function UserMapPage() {
   // ── Refs ───────────────────────────────────────────────────────────────────
   const lastPosRef         = React.useRef(null)
   const lastSpokenStepRef  = React.useRef({ idx: -1, ts: 0 })
-  const mapRef             = React.useRef(null)  // diisi oleh MapRefSetter
+  const mapRef             = React.useRef(null)
   const watchIdRef         = React.useRef(null)
   const closuresCacheRef   = React.useRef({ data: null, fetchedAt: 0 })
   const lastStreetFetchRef = React.useRef(0)
@@ -173,18 +167,22 @@ export default function UserMapPage() {
     }
   }
 
-  // ── Bootstrap ──────────────────────────────────────────────────────────────
+  // ── Bootstrap — DISESUAIKAN: endpoint /map-bootstrap (FastAPI) ─────────────
+  // Perubahan dari versi lama:
+  //   /map_bootstrap  →  /map-bootstrap
+  //   data.parking_spots  →  [] (FastAPI belum punya parking_spots, fallback kosong)
   React.useEffect(() => {
     let alive = true
     ;(async () => {
       setLoadingBootstrap(true); setLoadingEvents(true); setLoadingClosures(true)
       try {
-        const { data } = await api.get('/map_bootstrap')
+        const { data } = await api.get('/map-bootstrap')
         if (!alive) return
         setEvents(Array.isArray(data.events) ? data.events : [])
         const cl = Array.isArray(data.closures_active) ? data.closures_active : []
         setClosures(cl)
         closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
+        // parking_spots belum ada di FastAPI backend, set kosong
         setParkingSpots(Array.isArray(data.parking_spots) ? data.parking_spots : [])
         setCongestionZones(Array.isArray(data.congestion_active) ? data.congestion_active : [])
       } catch (e) {
@@ -224,14 +222,14 @@ export default function UserMapPage() {
     fillAddressFor('end', pt)
   }
 
-  // ── Refresh closures + congestion ──────────────────────────────────────────
+  // ── Refresh closures — DISESUAIKAN: endpoint /map-bootstrap ───────────────
   async function refreshClosures({ force = false, silent = true } = {}) {
     const cache = closuresCacheRef.current
     if (!force && cache.data && Date.now() - cache.fetchedAt < CLOSURES_TTL_MS) { setClosures(cache.data || []); return }
     if (!silent) setMsg('Memuat rekayasa jalan...')
     setLoadingClosures(true)
     try {
-      const { data } = await api.get('/map_bootstrap')
+      const { data } = await api.get('/map-bootstrap')
       const cl = Array.isArray(data?.closures_active) ? data.closures_active : []
       setClosures(cl)
       closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
@@ -240,7 +238,29 @@ export default function UserMapPage() {
     finally { setLoadingClosures(false) }
   }
 
-  // ── Route finding ──────────────────────────────────────────────────────────
+  // ── Route finding — DISESUAIKAN untuk response format FastAPI ─────────────
+  // FastAPI /route mengembalikan:
+  //   { polyline, instructions, summary, astar_path, closures_active, congestion_active }
+  // Kita normalisasi ke format yang dipakai komponen (steps, total_time_sec, total_length_m, polyline)
+  function normalizeRoute(data, mode) {
+    if (!data) return null
+    // Normalisasi steps dari instructions TomTom
+    const steps = (data.instructions || []).map(inst => ({
+      instruction: inst.text || '',
+      type:        inst.maneuver || '',
+      distance_m:  inst.distance || 0,
+      location:    inst.point || null,
+    }))
+    return {
+      polyline:        data.polyline || data.astar_path || [],
+      steps,
+      total_time_sec:  data.summary?.duration_s   || 0,
+      total_length_m:  data.summary?.distance_m   || 0,
+      traffic_delay_s: data.summary?.traffic_delay_s || 0,
+      mode,
+    }
+  }
+
   async function findRoute(customStart, customEnd, { silent = false } = {}) {
     const s = customStart || start, e = customEnd || end
     if (!s || !e) { if (!silent) setMsg('START dan TUJUAN wajib diisi.'); return }
@@ -248,8 +268,13 @@ export default function UserMapPage() {
     if (!silent) setMsg('Menghitung rute A* (tercepat & terpendek)...')
     setRoutes({ fastest: null, shortest: null }); setSteps([]); setStepIdx(0)
     try {
-      const { data } = await api.post('/route', { start: s, end: e, mode: 'both' })
-      const fast = data.fastest || null, short = data.shortest || null
+      // Kirim dua request paralel: fastest dan shortest
+      const [resFast, resShort] = await Promise.all([
+        api.post('/route', { start: s, end: e, mode: 'fastest' }),
+        api.post('/route', { start: s, end: e, mode: 'shortest' }),
+      ])
+      const fast  = normalizeRoute(resFast.data,  'fastest')
+      const short = normalizeRoute(resShort.data, 'shortest')
       setRoutes({ fastest: fast, shortest: short })
       const chosen = (selectedMode === 'shortest' ? short : fast) || fast || short
       if (chosen) { setSteps(Array.isArray(chosen.steps) ? chosen.steps : []); setStepIdx(0) }
@@ -257,7 +282,7 @@ export default function UserMapPage() {
       await refreshClosures({ force: true, silent: true })
       if (mapRef.current && s) setTimeout(() => mapRef.current?.flyTo([s.lat, s.lng], 16, { animate: true, duration: 1.2 }), 350)
     } catch (e2) {
-      if (!silent) setMsg('Gagal: ' + (e2?.response?.data?.error || e2.message))
+      if (!silent) setMsg('Gagal: ' + (e2?.response?.data?.detail || e2?.response?.data?.error || e2.message))
     } finally { setLoadingRoute(false) }
   }
 
@@ -267,8 +292,9 @@ export default function UserMapPage() {
     try {
       const { data } = await api.post('/route', { start: s, end: e, mode: selectedMode })
       if (!data) return
-      setRoutes(prev => ({ ...prev, [selectedMode]: data }))
-      setSteps(Array.isArray(data.steps) ? data.steps : [])
+      const normalized = normalizeRoute(data, selectedMode)
+      setRoutes(prev => ({ ...prev, [selectedMode]: normalized }))
+      setSteps(Array.isArray(normalized.steps) ? normalized.steps : [])
       setStepIdx(0)
       await refreshClosures({ force: true, silent: true })
     } catch (err) { console.warn('rerouteSelected failed:', err) }
@@ -296,26 +322,13 @@ export default function UserMapPage() {
     if (!navigator.geolocation) return setGeoErr('Browser tidak mendukung Geolocation.')
     if (watchIdRef.current != null) return
     lastPosRef.current = null
-
-    // ── FIX: Gunakan getCurrentPosition dulu untuk dapat posisi GPS aktual,
-    // lalu fly kamera ke sana SEBELUM watchPosition dimulai.
-    // Ini mengatasi dua masalah sekaligus:
-    //   1. mapRef.current sudah pasti terisi (via MapRefSetter)
-    //   2. Fly ke posisi GPS nyata, bukan ke titik yang diklik di peta
     navigator.geolocation.getCurrentPosition(
       firstPos => {
         const firstPt = { lat: firstPos.coords.latitude, lng: firstPos.coords.longitude }
         setMyPos(firstPt)
-
-        // Fly kamera ke posisi GPS aktual user
         if (mapRef.current) {
-          mapRef.current.flyTo([firstPt.lat, firstPt.lng], FOLLOW_ZOOM, {
-            animate: true,
-            duration: 1.5,
-          })
+          mapRef.current.flyTo([firstPt.lat, firstPt.lng], FOLLOW_ZOOM, { animate: true, duration: 1.5 })
         }
-
-        // Mulai watch setelah dapat posisi pertama
         watchIdRef.current = navigator.geolocation.watchPosition(
           pos => {
             const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude }
@@ -325,10 +338,7 @@ export default function UserMapPage() {
             else if (lastPosRef.current) setBearing(bearingDeg(lastPosRef.current, pt))
             lastPosRef.current = pt
             if (followMe && mapRef.current) {
-              mapRef.current.flyTo([pt.lat, pt.lng], FOLLOW_ZOOM, {
-                animate: true,
-                duration: FOLLOW_FLY_DURATION,
-              })
+              mapRef.current.flyTo([pt.lat, pt.lng], FOLLOW_ZOOM, { animate: true, duration: FOLLOW_FLY_DURATION })
             }
           },
           err => setGeoErr(err.message || 'Navigasi gagal (GPS).'),
@@ -337,9 +347,7 @@ export default function UserMapPage() {
         setTracking(true)
         setMsg('Navigasi aktif. Jika melenceng dari rute, sistem akan hitung ulang otomatis.')
       },
-      err => {
-        setGeoErr(err.message || 'Gagal mendapatkan posisi GPS.')
-      },
+      err => { setGeoErr(err.message || 'Gagal mendapatkan posisi GPS.') },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     )
   }
@@ -376,13 +384,15 @@ export default function UserMapPage() {
     speak(st.instruction, { rate: 1.02, pitch: 1.0, lang: 'id-ID' })
   }, [tracking, voiceOn, stepIdx, steps]) // eslint-disable-line
 
+  // ── Nearest street — DISESUAIKAN: endpoint /nearest-node (FastAPI) ─────────
+  // Flask pakai /nearest_street, FastAPI pakai /nearest-node
   React.useEffect(() => {
     if (!tracking || !myPos) return
     const now = Date.now()
     if (now - lastStreetFetchRef.current < STREET_FETCH_MIN_MS) return
     lastStreetFetchRef.current = now
-    api.get(`/nearest_street?lat=${myPos.lat}&lng=${myPos.lng}`)
-      .then(res => setCurrentStreet(res?.data?.street_name || ''))
+    api.get(`/nearest-node?lat=${myPos.lat}&lng=${myPos.lng}`)
+      .then(res => setCurrentStreet(res?.data?.name || ''))
       .catch(() => {})
   }, [tracking, myPos?.lat, myPos?.lng]) // eslint-disable-line
 
@@ -674,7 +684,6 @@ export default function UserMapPage() {
 
         {/* ── Map ── */}
         <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ height: '100%', width: '100%' }}>
-          {/* FIX: MapRefSetter menggantikan whenCreated yang deprecated di react-leaflet v4 */}
           <MapRefSetter mapRef={mapRef} />
           <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           <ClickSetter mode={pickMode} onPick={onPick} />
