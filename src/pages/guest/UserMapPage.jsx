@@ -1,7 +1,9 @@
 import React from 'react'
 import { MapContainer, TileLayer, useMap } from 'react-leaflet'
+import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { api } from '../../lib/api.js'
+import { usePoiSearch } from '../../hooks/usePoiSearch.js'
 import RightDockPanel from '../../components/RightDockPanel.jsx'
 import MapLayers, { ClickSetter } from '../../components/map/MapLayers.jsx'
 import {
@@ -19,6 +21,7 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DEFAULT_CENTER         = [-7.871, 111.462]
+const TOMTOM_KEY             = import.meta.env.VITE_TOMTOM_KEY || ''
 const OFF_ROUTE_TOLERANCE_M  = 35
 const NAVBAR_H_PX            = 80
 const CLOSURES_TTL_MS        = 30_000
@@ -28,6 +31,138 @@ const FOLLOW_ZOOM            = 18
 const FOLLOW_FLY_DURATION    = 0.65
 const REVERSE_GEO_TTL_MS     = 24 * 60 * 60 * 1000
 const REVERSE_GEO_TIMEOUT_MS = 9000
+
+// ─── TomTom Search Box ───────────────────────────────────────────────────────
+// Mendukung autocomplete via backend /search (TomTom fuzzy + OSM fallback + alias lokal)
+// Props identik — tidak ada perubahan interface keluar
+function TomTomSearchBox({ mode, value, onSelect, disabled, icon: Icon, label, placeholder, active, onClickRow, tracking, userLat, userLon }) {
+  const [query, setQuery] = React.useState('')
+  const [open,  setOpen]  = React.useState(false)
+  const wrapRef           = React.useRef(null)
+
+  // Hook pencarian — debounce 350ms, fallback OSM otomatis
+  const { results, loading, error, search, clear } = usePoiSearch({
+    userLat, userLon, debounceMs: 350, limit: 7,
+  })
+
+  // Sync display value dari luar (setelah klik peta / URL param)
+  React.useEffect(() => {
+    if (value && value !== query) setQuery(value)
+  }, [value]) // eslint-disable-line
+
+  // Buka dropdown saat ada hasil baru
+  React.useEffect(() => {
+    if (results.length > 0) setOpen(true)
+  }, [results])
+
+  // Tutup dropdown saat klik di luar
+  React.useEffect(() => {
+    const fn = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [])
+
+  function handleChange(e) {
+    const q = e.target.value
+    setQuery(q)
+    if (!q) { onSelect(null, mode); clear(); setOpen(false); return }
+    search(q)
+  }
+
+  function handleSelect(res) {
+    setQuery(res.name)
+    setOpen(false)
+    clear()
+    onSelect({ lat: res.lat, lng: res.lon, label: res.name }, mode)
+  }
+
+  // Badge tipe hasil — POI / street / place / osm
+  const TYPE_LABEL = { poi: 'Tempat', street: 'Jalan', place: 'Wilayah', osm: 'OSM' }
+  const TYPE_COLOR = { poi: '#7c3aed', street: '#1d4ed8', place: '#047857', osm: '#b45309' }
+
+  const isActive = active && !tracking
+  return (
+    <div ref={wrapRef} className="relative w-full">
+      {/* ── Label row — sama persis dengan aslinya ── */}
+      <div
+        onClick={() => { if (!tracking) onClickRow() }}
+        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition cursor-pointer
+          ${isActive ? 'border-[#8b1a1a] bg-[#FEF5F5] ring-2 ring-[#8b1a1a]/20' : 'border-[#DDD8D0] bg-white hover:bg-[#F4F2EF]'}`}
+      >
+        <span className={`flex h-7 w-7 items-center justify-center rounded-lg flex-shrink-0
+          ${isActive ? 'bg-[#8b1a1a] text-white' : 'bg-[#F4F2EF] text-[#6B6560]'}`}>
+          <Icon className="w-3.5 h-3.5" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-extrabold text-[#6B6560] uppercase tracking-[0.08em]">{label}</p>
+          <p className={`text-xs font-semibold truncate ${isActive ? 'text-[#8b1a1a]' : 'text-[#2B3440]'}`}>
+            {query || <span className="text-[#A09890]">{placeholder}</span>}
+          </p>
+        </div>
+        {/* Loading spinner */}
+        {loading && (
+          <span className="w-3.5 h-3.5 border-2 border-[#DDD8D0] border-t-[#8b1a1a] rounded-full animate-spin flex-shrink-0" />
+        )}
+      </div>
+
+      {/* ── Input pencarian — hanya muncul saat mode aktif ── */}
+      {isActive && (
+        <div className="mt-1 relative">
+          <input
+            autoFocus
+            type="text"
+            value={query}
+            onChange={handleChange}
+            onFocus={() => results.length > 0 && setOpen(true)}
+            placeholder="Ketik nama tempat, kampus, rumah sakit..."
+            className="w-full pl-3 pr-8 py-2 text-xs font-semibold border border-[#8b1a1a]/40 rounded-xl
+              bg-white focus:outline-none focus:ring-2 focus:ring-[#8b1a1a]/20 text-[#2B3440] placeholder:text-[#A09890]"
+          />
+          {loading
+            ? <span className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-[#DDD8D0] border-t-[#8b1a1a] rounded-full animate-spin" />
+            : <IconSearch className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8b1a1a]" />
+          }
+          {/* Error hint */}
+          {error && (
+            <p className="mt-1 text-[10px] text-[#8b1a1a] font-semibold px-1">{error}</p>
+          )}
+        </div>
+      )}
+
+      {/* ── Dropdown hasil ── */}
+      {isActive && open && results.length > 0 && (
+        <div className="absolute left-0 right-0 z-[9999] mt-1 bg-white rounded-xl border border-[#DDD8D0] shadow-xl overflow-hidden max-h-56 overflow-y-auto">
+          {results.map((res, i) => (
+            <button key={`${res.lat}_${res.lon}_${i}`} onClick={() => handleSelect(res)}
+              className="w-full flex items-start gap-2.5 px-3 py-2.5 hover:bg-[#FEF5F5] text-left transition border-b last:border-0 border-[#F4F2EF]">
+              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#F4F2EF] text-[#8b1a1a] flex-shrink-0 mt-0.5">
+                <IconMapPin className="w-3 h-3" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <p className="text-xs font-bold text-[#2B3440] truncate flex-1">{res.name}</p>
+                  {/* Badge tipe */}
+                  <span style={{ color: TYPE_COLOR[res.type] || '#6b7280' }}
+                    className="text-[9px] font-extrabold uppercase tracking-wide flex-shrink-0 px-1.5 py-0.5 rounded-md bg-[#F4F2EF]">
+                    {TYPE_LABEL[res.type] || res.type}
+                  </span>
+                </div>
+                <p className="text-[10px] text-[#6B6560] truncate">{res.address}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Empty state — hanya muncul saat active, sudah ada query, tidak loading ── */}
+      {isActive && open && !loading && query.length >= 2 && results.length === 0 && !error && (
+        <div className="absolute left-0 right-0 z-[9999] mt-1 bg-white rounded-xl border border-[#DDD8D0] shadow-xl px-3 py-3">
+          <p className="text-xs text-[#A09890] font-semibold text-center">Tidak ada hasil untuk "{query}"</p>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── MapRefSetter ─────────────────────────────────────────────────────────────
 function MapRefSetter({ mapRef }) {
@@ -100,6 +235,11 @@ export default function UserMapPage() {
   const [parkingSpots,      setParkingSpots]     = React.useState([])
   const [selectedParkingId, setSelectedParkingId] = React.useState('')
   const [destinationType,   setDestinationType]   = React.useState(null)
+
+  // ── FIX: URL search params (dari JadwalPage "Lihat di Map") ───────────────
+  const [searchParams] = useSearchParams()
+  // Mode search aktif: 'start' | 'end' | null — untuk TomTomSearchBox
+  const [searchActiveMode, setSearchActiveMode] = React.useState(null)
 
   // ── Refs ───────────────────────────────────────────────────────────────────
   const lastPosRef         = React.useRef(null)
@@ -196,11 +336,50 @@ export default function UserMapPage() {
     return () => { alive = false }
   }, [])
 
+  // ── FIX: Baca URL params dari JadwalPage "Lihat di Map" ─────────────────────
+  // Dipanggil setelah events berhasil dimuat dari bootstrap
+  // Params: ?eventId=xxx&lat=xxx&lng=xxx
+  React.useEffect(() => {
+    const eventId = searchParams.get('eventId')
+    const lat     = parseFloat(searchParams.get('lat'))
+    const lng     = parseFloat(searchParams.get('lng'))
+    if (!eventId) return
+    // Set selected event
+    setSelectedEventId(eventId)
+    setDestinationType('event')
+    // Kalau ada koordinat, langsung set sebagai tujuan
+    if (!isNaN(lat) && !isNaN(lng)) {
+      const pt = { lat, lng }
+      setEnd(pt)
+      fillAddressFor('end', pt)
+      setMsg('Tujuan dari event sudah dipilih. Tambahkan titik START lalu tekan "Cari Rute".')
+      // Fly ke lokasi event setelah map siap
+      setTimeout(() => {
+        if (mapRef.current) mapRef.current.flyTo([lat, lng], 16, { animate: true, duration: 1.2 })
+      }, 600)
+    }
+  }, [searchParams, events]) // eslint-disable-line
+
   // ── Pick handler ───────────────────────────────────────────────────────────
   function onPick(latlng, mode) {
     if (mode === 'start') { setStart(latlng); setMsg('START tersimpan. Sekarang pilih TUJUAN.') }
     else                  { setEnd(latlng);   setMsg('TUJUAN tersimpan. Tekan "Cari Rute".') }
     fillAddressFor(mode, latlng)
+  }
+
+  // ── FIX: Handler TomTom Search select ────────────────────────────────────────
+  function onSearchSelect(latlng, mode) {
+    if (!latlng) return
+    if (mode === 'start') {
+      setStart(latlng); setStartAddr(latlng.label || '')
+      setMsg('START tersimpan dari pencarian. Sekarang pilih TUJUAN.')
+    } else {
+      setEnd(latlng); setEndAddr(latlng.label || '')
+      setDestinationType(null)
+      setMsg('TUJUAN tersimpan dari pencarian. Tekan "Cari Rute".')
+    }
+    if (mapRef.current) mapRef.current.flyTo([latlng.lat, latlng.lng], 16, { animate: true, duration: 0.8 })
+    setSearchActiveMode(null)
   }
 
   // ── Destination helpers ────────────────────────────────────────────────────
@@ -257,6 +436,9 @@ export default function UserMapPage() {
       total_time_sec:  data.summary?.duration_s   || 0,
       total_length_m:  data.summary?.distance_m   || 0,
       traffic_delay_s: data.summary?.traffic_delay_s || 0,
+      // 🔥 BARU: traffic_segments dari TomTom sections → dirender sebagai polyline
+      //          merah/orange di atas rute biru oleh MapLayers → TrafficPolylines
+      traffic_segments: Array.isArray(data.traffic_segments) ? data.traffic_segments : [],
       mode,
     }
   }
@@ -453,22 +635,52 @@ export default function UserMapPage() {
             <p className="text-xs font-semibold text-[#2B3440] leading-relaxed">{msg}</p>
           </div>
 
-          {/* Location inputs */}
+          {/* Location inputs — dengan TomTom Search */}
           <div className="mb-1">
             <div className="relative flex flex-col gap-1.5">
-              <LocationRow icon={IconLocationPin} label="Titik Awal" value={startLabel}
-                placeholder="Pilih di peta atau gunakan lokasi saya"
-                active={pickMode === 'start' && !tracking}
-                onClick={() => { if (!tracking) { setPickMode('start'); setMsg('Mode: pilih START. Klik peta.') } }} />
+              <TomTomSearchBox
+                mode="start"
+                icon={IconLocationPin}
+                label="Titik Awal"
+                value={startLabel}
+                placeholder="Cari atau pilih di peta..."
+                active={searchActiveMode === 'start' || (pickMode === 'start' && !tracking)}
+                tracking={tracking}
+                onSelect={onSearchSelect}
+                userLat={myPos?.lat}
+                userLon={myPos?.lng}
+                onClickRow={() => {
+                  if (!tracking) {
+                    setSearchActiveMode(m => m === 'start' ? null : 'start')
+                    setPickMode('start')
+                    setMsg('Ketik nama tempat atau klik di peta untuk START.')
+                  }
+                }}
+              />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[#DDD8D0] bg-white shadow-sm text-[#6B6560]">
                   <IconArrowSwap className="w-3.5 h-3.5" />
                 </span>
               </div>
-              <LocationRow icon={IconFlag} label="Tujuan" value={endLabel}
-                placeholder="Pilih di peta atau dari event"
-                active={pickMode === 'end' && !tracking}
-                onClick={() => { if (!tracking) { setPickMode('end'); setMsg('Mode: pilih TUJUAN. Klik peta.') } }} />
+              <TomTomSearchBox
+                mode="end"
+                icon={IconFlag}
+                label="Tujuan"
+                value={endLabel}
+                placeholder="Cari tempat tujuan..."
+                active={searchActiveMode === 'end' || (pickMode === 'end' && !tracking)}
+                tracking={tracking}
+                onSelect={onSearchSelect}
+                userLat={myPos?.lat}
+                userLon={myPos?.lng}
+                onClickRow={() => {
+                  if (!tracking) {
+                    setSearchActiveMode(m => m === 'end' ? null : 'end')
+                    setPickMode('end')
+                    setMsg('Ketik nama tempat atau klik di peta untuk TUJUAN.')
+                  }
+                }}
+              />
             </div>
           </div>
 
