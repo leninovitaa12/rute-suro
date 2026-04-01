@@ -32,30 +32,38 @@ const FOLLOW_FLY_DURATION    = 0.65
 const REVERSE_GEO_TTL_MS     = 24 * 60 * 60 * 1000
 const REVERSE_GEO_TIMEOUT_MS = 9000
 
+function isZoneStillActive(zone) {
+  if (!zone || zone.is_active === false) return false
+  if (!zone.end_time) return true
+
+  const end = new Date(zone.end_time).getTime()
+  if (Number.isNaN(end)) return true
+
+  return end > Date.now()
+}
+
+function filterActiveZones(zones) {
+  return Array.isArray(zones) ? zones.filter(isZoneStillActive) : []
+}
+
 // ─── TomTom Search Box ───────────────────────────────────────────────────────
-// Mendukung autocomplete via backend /search (TomTom fuzzy + OSM fallback + alias lokal)
-// Props identik — tidak ada perubahan interface keluar
 function TomTomSearchBox({ mode, value, onSelect, disabled, icon: Icon, label, placeholder, active, onClickRow, tracking, userLat, userLon }) {
   const [query, setQuery] = React.useState('')
   const [open,  setOpen]  = React.useState(false)
   const wrapRef           = React.useRef(null)
 
-  // Hook pencarian — debounce 350ms, fallback OSM otomatis
   const { results, loading, error, search, clear } = usePoiSearch({
     userLat, userLon, debounceMs: 350, limit: 7,
   })
 
-  // Sync display value dari luar (setelah klik peta / URL param)
   React.useEffect(() => {
     if (value && value !== query) setQuery(value)
   }, [value]) // eslint-disable-line
 
-  // Buka dropdown saat ada hasil baru
   React.useEffect(() => {
     if (results.length > 0) setOpen(true)
   }, [results])
 
-  // Tutup dropdown saat klik di luar
   React.useEffect(() => {
     const fn = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', fn)
@@ -76,14 +84,12 @@ function TomTomSearchBox({ mode, value, onSelect, disabled, icon: Icon, label, p
     onSelect({ lat: res.lat, lng: res.lon, label: res.name }, mode)
   }
 
-  // Badge tipe hasil — POI / street / place / osm
   const TYPE_LABEL = { poi: 'Tempat', street: 'Jalan', place: 'Wilayah', osm: 'OSM' }
   const TYPE_COLOR = { poi: '#7c3aed', street: '#1d4ed8', place: '#047857', osm: '#b45309' }
 
   const isActive = active && !tracking
   return (
     <div ref={wrapRef} className="relative w-full">
-      {/* ── Label row — sama persis dengan aslinya ── */}
       <div
         onClick={() => { if (!tracking) onClickRow() }}
         className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition cursor-pointer
@@ -99,13 +105,11 @@ function TomTomSearchBox({ mode, value, onSelect, disabled, icon: Icon, label, p
             {query || <span className="text-[#A09890]">{placeholder}</span>}
           </p>
         </div>
-        {/* Loading spinner */}
         {loading && (
           <span className="w-3.5 h-3.5 border-2 border-[#DDD8D0] border-t-[#8b1a1a] rounded-full animate-spin flex-shrink-0" />
         )}
       </div>
 
-      {/* ── Input pencarian — hanya muncul saat mode aktif ── */}
       {isActive && (
         <div className="mt-1 relative">
           <input
@@ -122,14 +126,12 @@ function TomTomSearchBox({ mode, value, onSelect, disabled, icon: Icon, label, p
             ? <span className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-[#DDD8D0] border-t-[#8b1a1a] rounded-full animate-spin" />
             : <IconSearch className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8b1a1a]" />
           }
-          {/* Error hint */}
           {error && (
             <p className="mt-1 text-[10px] text-[#8b1a1a] font-semibold px-1">{error}</p>
           )}
         </div>
       )}
 
-      {/* ── Dropdown hasil ── */}
       {isActive && open && results.length > 0 && (
         <div className="absolute left-0 right-0 z-[9999] mt-1 bg-white rounded-xl border border-[#DDD8D0] shadow-xl overflow-hidden max-h-56 overflow-y-auto">
           {results.map((res, i) => (
@@ -141,7 +143,6 @@ function TomTomSearchBox({ mode, value, onSelect, disabled, icon: Icon, label, p
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <p className="text-xs font-bold text-[#2B3440] truncate flex-1">{res.name}</p>
-                  {/* Badge tipe */}
                   <span style={{ color: TYPE_COLOR[res.type] || '#6b7280' }}
                     className="text-[9px] font-extrabold uppercase tracking-wide flex-shrink-0 px-1.5 py-0.5 rounded-md bg-[#F4F2EF]">
                     {TYPE_LABEL[res.type] || res.type}
@@ -154,7 +155,6 @@ function TomTomSearchBox({ mode, value, onSelect, disabled, icon: Icon, label, p
         </div>
       )}
 
-      {/* ── Empty state — hanya muncul saat active, sudah ada query, tidak loading ── */}
       {isActive && open && !loading && query.length >= 2 && results.length === 0 && !error && (
         <div className="absolute left-0 right-0 z-[9999] mt-1 bg-white rounded-xl border border-[#DDD8D0] shadow-xl px-3 py-3">
           <p className="text-xs text-[#A09890] font-semibold text-center">Tidak ada hasil untuk "{query}"</p>
@@ -204,8 +204,6 @@ const SecCtrl = ({ active, onClick, activeClass, inactiveClass, children }) => (
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function UserMapPage() {
-
-  // ── State ──────────────────────────────────────────────────────────────────
   const [events,            setEvents]           = React.useState([])
   const [closures,          setClosures]         = React.useState([])
   const [congestionZones,   setCongestionZones]  = React.useState([])
@@ -236,12 +234,9 @@ export default function UserMapPage() {
   const [selectedParkingId, setSelectedParkingId] = React.useState('')
   const [destinationType,   setDestinationType]   = React.useState(null)
 
-  // ── FIX: URL search params (dari JadwalPage "Lihat di Map") ───────────────
   const [searchParams] = useSearchParams()
-  // Mode search aktif: 'start' | 'end' | null — untuk TomTomSearchBox
   const [searchActiveMode, setSearchActiveMode] = React.useState(null)
 
-  // ── Refs ───────────────────────────────────────────────────────────────────
   const lastPosRef         = React.useRef(null)
   const lastSpokenStepRef  = React.useRef({ idx: -1, ts: 0 })
   const mapRef             = React.useRef(null)
@@ -251,7 +246,6 @@ export default function UserMapPage() {
   const reverseCacheRef    = React.useRef(new Map())
   const reverseAbortRef    = React.useRef({ start: null, end: null })
 
-  // ── Derived ────────────────────────────────────────────────────────────────
   const isMobile      = typeof window !== 'undefined' ? window.innerWidth < 1024 : false
   const activeRoute   = routes?.[selectedMode] || null
   const activeStep    = steps?.[stepIdx]
@@ -272,7 +266,6 @@ export default function UserMapPage() {
 
   React.useEffect(() => { if (isMobile) setRightPanelOpen(true) }, [isMobile])
 
-  // ── Reverse geocode ────────────────────────────────────────────────────────
   const roundKey = (lat, lng) => `${lat.toFixed(5)},${lng.toFixed(5)}`
 
   async function reverseGeocodeOSM(lat, lng, { signal } = {}) {
@@ -307,10 +300,6 @@ export default function UserMapPage() {
     }
   }
 
-  // ── Bootstrap — DISESUAIKAN: endpoint /map-bootstrap (FastAPI) ─────────────
-  // Perubahan dari versi lama:
-  //   /map_bootstrap  →  /map-bootstrap
-  //   data.parking_spots  →  [] (FastAPI belum punya parking_spots, fallback kosong)
   React.useEffect(() => {
     let alive = true
     ;(async () => {
@@ -322,9 +311,8 @@ export default function UserMapPage() {
         const cl = Array.isArray(data.closures_active) ? data.closures_active : []
         setClosures(cl)
         closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
-        // parking_spots belum ada di FastAPI backend, set kosong
         setParkingSpots(Array.isArray(data.parking_spots) ? data.parking_spots : [])
-        setCongestionZones(Array.isArray(data.congestion_active) ? data.congestion_active : [])
+        setCongestionZones(filterActiveZones(data.congestion_active))
       } catch (e) {
         if (!alive) return
         setMsg('Gagal memuat data peta: ' + (e?.response?.data?.error || e.message))
@@ -336,38 +324,30 @@ export default function UserMapPage() {
     return () => { alive = false }
   }, [])
 
-  // ── FIX: Baca URL params dari JadwalPage "Lihat di Map" ─────────────────────
-  // Dipanggil setelah events berhasil dimuat dari bootstrap
-  // Params: ?eventId=xxx&lat=xxx&lng=xxx
   React.useEffect(() => {
     const eventId = searchParams.get('eventId')
     const lat     = parseFloat(searchParams.get('lat'))
     const lng     = parseFloat(searchParams.get('lng'))
     if (!eventId) return
-    // Set selected event
     setSelectedEventId(eventId)
     setDestinationType('event')
-    // Kalau ada koordinat, langsung set sebagai tujuan
     if (!isNaN(lat) && !isNaN(lng)) {
       const pt = { lat, lng }
       setEnd(pt)
       fillAddressFor('end', pt)
       setMsg('Tujuan dari event sudah dipilih. Tambahkan titik START lalu tekan "Cari Rute".')
-      // Fly ke lokasi event setelah map siap
       setTimeout(() => {
         if (mapRef.current) mapRef.current.flyTo([lat, lng], 16, { animate: true, duration: 1.2 })
       }, 600)
     }
   }, [searchParams, events]) // eslint-disable-line
 
-  // ── Pick handler ───────────────────────────────────────────────────────────
   function onPick(latlng, mode) {
     if (mode === 'start') { setStart(latlng); setMsg('START tersimpan. Sekarang pilih TUJUAN.') }
     else                  { setEnd(latlng);   setMsg('TUJUAN tersimpan. Tekan "Cari Rute".') }
     fillAddressFor(mode, latlng)
   }
 
-  // ── FIX: Handler TomTom Search select ────────────────────────────────────────
   function onSearchSelect(latlng, mode) {
     if (!latlng) return
     if (mode === 'start') {
@@ -382,7 +362,6 @@ export default function UserMapPage() {
     setSearchActiveMode(null)
   }
 
-  // ── Destination helpers ────────────────────────────────────────────────────
   function applyEventAsDestination() {
     const ev = events.find(e => e.id === selectedEventId)
     if (!ev) return
@@ -401,7 +380,6 @@ export default function UserMapPage() {
     fillAddressFor('end', pt)
   }
 
-  // ── Refresh closures — DISESUAIKAN: endpoint /map-bootstrap ───────────────
   async function refreshClosures({ force = false, silent = true } = {}) {
     const cache = closuresCacheRef.current
     if (!force && cache.data && Date.now() - cache.fetchedAt < CLOSURES_TTL_MS) { setClosures(cache.data || []); return }
@@ -412,18 +390,13 @@ export default function UserMapPage() {
       const cl = Array.isArray(data?.closures_active) ? data.closures_active : []
       setClosures(cl)
       closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
-      setCongestionZones(Array.isArray(data?.congestion_active) ? data.congestion_active : [])
+      setCongestionZones(filterActiveZones(data?.congestion_active))
     } catch (e) { console.warn('refreshClosures failed:', e) }
     finally { setLoadingClosures(false) }
   }
 
-  // ── Route finding — DISESUAIKAN untuk response format FastAPI ─────────────
-  // FastAPI /route mengembalikan:
-  //   { polyline, instructions, summary, astar_path, closures_active, congestion_active }
-  // Kita normalisasi ke format yang dipakai komponen (steps, total_time_sec, total_length_m, polyline)
   function normalizeRoute(data, mode) {
     if (!data) return null
-    // Normalisasi steps dari instructions TomTom
     const steps = (data.instructions || []).map(inst => ({
       instruction: inst.text || '',
       type:        inst.maneuver || '',
@@ -436,8 +409,6 @@ export default function UserMapPage() {
       total_time_sec:  data.summary?.duration_s   || 0,
       total_length_m:  data.summary?.distance_m   || 0,
       traffic_delay_s: data.summary?.traffic_delay_s || 0,
-      // 🔥 BARU: traffic_segments dari TomTom sections → dirender sebagai polyline
-      //          merah/orange di atas rute biru oleh MapLayers → TrafficPolylines
       traffic_segments: Array.isArray(data.traffic_segments) ? data.traffic_segments : [],
       mode,
     }
@@ -450,7 +421,6 @@ export default function UserMapPage() {
     if (!silent) setMsg('Menghitung rute A* (tercepat & terpendek)...')
     setRoutes({ fastest: null, shortest: null }); setSteps([]); setStepIdx(0)
     try {
-      // Kirim dua request paralel: fastest dan shortest
       const [resFast, resShort] = await Promise.all([
         api.post('/route', { start: s, end: e, mode: 'fastest' }),
         api.post('/route', { start: s, end: e, mode: 'shortest' }),
@@ -482,7 +452,6 @@ export default function UserMapPage() {
     } catch (err) { console.warn('rerouteSelected failed:', err) }
   }
 
-  // ── Geolocation ────────────────────────────────────────────────────────────
   function useMyLocationAsStart() {
     setGeoErr('')
     if (!navigator.geolocation) return setGeoErr('Browser tidak mendukung Geolocation.')
@@ -539,7 +508,6 @@ export default function UserMapPage() {
     watchIdRef.current = null; setTracking(false); setMsg('Navigasi dimatikan.')
   }
 
-  // ── Effects ────────────────────────────────────────────────────────────────
   React.useEffect(() => () => stopTracking(), [])
 
   React.useEffect(() => {
@@ -566,8 +534,6 @@ export default function UserMapPage() {
     speak(st.instruction, { rate: 1.02, pitch: 1.0, lang: 'id-ID' })
   }, [tracking, voiceOn, stepIdx, steps]) // eslint-disable-line
 
-  // ── Nearest street — DISESUAIKAN: endpoint /nearest-node (FastAPI) ─────────
-  // Flask pakai /nearest_street, FastAPI pakai /nearest-node
   React.useEffect(() => {
     if (!tracking || !myPos) return
     const now = Date.now()
@@ -589,7 +555,6 @@ export default function UserMapPage() {
     return () => clearInterval(id)
   }, [tracking]) // eslint-disable-line
 
-  // ── Recenter ───────────────────────────────────────────────────────────────
   const handleRecenter = () => {
     if (!mapRef.current) return
     const target = myPos || start
@@ -597,13 +562,11 @@ export default function UserMapPage() {
     else mapRef.current.flyTo(DEFAULT_CENTER, 13, { animate: true, duration: 0.6 })
   }
 
-  // ── Route button config ────────────────────────────────────────────────────
   const routeBtns = [
     { key: 'fastest',  Icon: IconZap,      label: 'Tercepat',  route: fastest,  activeText: 'text-yellow-300', inactiveText: 'text-[#8b1a1a]' },
     { key: 'shortest', Icon: IconMinimize, label: 'Terpendek', route: shortest, activeText: 'text-blue-300',   inactiveText: 'text-[#8b1a1a]' },
   ]
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="bg-gray-50">
       <div className="relative w-full" style={{ height: `calc(100vh - ${NAVBAR_H_PX}px)` }}>
@@ -612,10 +575,7 @@ export default function UserMapPage() {
         <InstructionOverlay tracking={tracking} activeStep={activeStep} distToNext={distToNext} />
         <RouteSummaryBar activeRoute={activeRoute} selectedMode={selectedMode} tracking={tracking} myPos={myPos} end={end} onRecenter={handleRecenter} />
 
-        {/* ── Right Panel ── */}
         <RightDockPanel open={rightPanelOpen} onToggle={() => setRightPanelOpen(v => !v)} title="RUTE SURO">
-
-          {/* Loading */}
           {loadingBootstrap && (
             <div className="mb-4 rounded-2xl border border-[#8b1a1a]/20 bg-[#FEF5F5] p-3">
               <div className="flex items-center gap-2 mb-2">
@@ -629,13 +589,11 @@ export default function UserMapPage() {
             </div>
           )}
 
-          {/* Status */}
           <div className="mb-3 rounded-2xl border border-[#DDD8D0] bg-[#F4F2EF] px-3 py-2.5">
             <p className="text-[11px] font-extrabold tracking-[0.08em] text-[#6B6560] uppercase mb-1">Status</p>
             <p className="text-xs font-semibold text-[#2B3440] leading-relaxed">{msg}</p>
           </div>
 
-          {/* Location inputs — dengan TomTom Search */}
           <div className="mb-1">
             <div className="relative flex flex-col gap-1.5">
               <TomTomSearchBox
@@ -689,7 +647,6 @@ export default function UserMapPage() {
             <IconMyLocation className="w-4 h-4 text-[#8b1a1a]" />Pakai Lokasi Saya sebagai START
           </button>
 
-          {/* Event & Parkir */}
           <SectionDivider label="Tujuan Event" />
           <div className="mb-1">
             <div className="flex items-center gap-2 mb-2">
@@ -747,7 +704,6 @@ export default function UserMapPage() {
 
           <SectionDivider label="Navigasi" />
 
-          {/* Turn-by-turn */}
           {tracking && (activeStep || currentStreet) && (
             <div className="mb-3">
               {currentStreet && (
@@ -775,19 +731,16 @@ export default function UserMapPage() {
             </div>
           )}
 
-          {/* Cari Rute */}
           <SBtn onClick={() => findRoute()} disabled={loadingRoute || !canFindRoute}
             cls={`mb-2 ${loadingRoute || !canFindRoute ? 'bg-[#C8C3BB] cursor-not-allowed' : 'bg-[#8b1a1a] hover:bg-[#6b1414] shadow-[0_4px_14px_rgba(139,26,26,0.30)]'}`}>
             {loadingRoute ? <><span className="animate-spin border-2 border-white/30 border-t-white rounded-full w-4 h-4" />Menghitung Rute...</> : <><IconSearch className="w-4 h-4" />Cari Rute Terbaik</>}
           </SBtn>
 
-          {/* Mulai / Stop Navigasi */}
           <SBtn onClick={() => tracking ? stopTracking() : startTracking()} disabled={!activeRoute && !tracking}
             cls={`mb-3 ${!activeRoute && !tracking ? 'bg-[#C8C3BB] cursor-not-allowed' : tracking ? 'bg-[#2B3440] hover:bg-gray-900' : 'bg-[#8b1a1a] hover:bg-[#6b1414] shadow-[0_4px_14px_rgba(139,26,26,0.30)]'}`}>
             {tracking ? <><IconStop className="w-4 h-4" />Stop Navigasi</> : <><IconNavigation className="w-4 h-4" />Mulai Navigasi</>}
           </SBtn>
 
-          {/* Kontrol sekunder */}
           <div className="grid grid-cols-3 gap-2 mb-3">
             <SecCtrl active={followMe} onClick={() => setFollowMe(v => !v)}
               activeClass="bg-[#2B3440] text-white border-[#2B3440]"
@@ -808,7 +761,6 @@ export default function UserMapPage() {
             </SecCtrl>
           </div>
 
-          {/* Pilih rute */}
           {hasRoutes && (
             <div className="mb-3">
               <div className="flex items-center justify-between mb-2">
@@ -845,14 +797,12 @@ export default function UserMapPage() {
             </div>
           )}
 
-          {/* Geo error */}
           {geoErr && (
             <div className="flex items-start gap-2 text-xs text-[#8b1a1a] font-semibold bg-[#FEF5F5] border border-[#8b1a1a]/30 rounded-xl p-3 mb-3">
               <IconAlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /><p>{geoErr}</p>
             </div>
           )}
 
-          {/* Legend */}
           <div className="rounded-2xl border border-[#DDD8D0] bg-[#F4F2EF] p-3">
             <div className="flex items-center gap-2 mb-1.5">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#8b1a1a] text-white"><IconAlertTriangle className="w-3.5 h-3.5" /></span>
@@ -894,7 +844,6 @@ export default function UserMapPage() {
           </div>
         </RightDockPanel>
 
-        {/* ── Map ── */}
         <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ height: '100%', width: '100%' }}>
           <MapRefSetter mapRef={mapRef} />
           <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />

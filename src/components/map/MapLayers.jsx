@@ -37,33 +37,12 @@ function SelectedBadge({ color = '#b91c1c', label }) {
   )
 }
 
-// ─── 🔥 BARU: TrafficPolylines ────────────────────────────────────────────────
-// Merender garis berwarna di atas rute berdasarkan traffic_segments dari TomTom.
-// traffic_segments = array dari /route response:
-//   [{
-//     start: 0, end: 5,
-//     delay: 180,
-//     color: "red" | "orange" | "green",
-//     level: "HEAVY" | "MODERATE" | "NORMAL",
-//     segment_points: [{lat, lng}, ...]
-//   }, ...]
-//
-// Hanya HEAVY (merah) dan MODERATE (orange) yang dirender.
-// NORMAL tidak dirender (biarkan warna rute utama yang tampil).
-//
-// Urutan layer (z-index):
-//   1. Rute biru (bawah)
-//   2. CongestionLines admin/tomtom (tengah, putus-putus)
-//   3. TrafficPolylines TomTom sections (atas, solid)
-//   4. Closure merah solid (paling atas)
-
 function TrafficPolylines({ trafficSegments }) {
   if (!Array.isArray(trafficSegments) || trafficSegments.length === 0) return null
 
   return (
     <>
       {trafficSegments.map((seg, i) => {
-        // Hanya render HEAVY dan MODERATE
         if (seg.level === 'NORMAL') return null
 
         const pts = (seg.segment_points || [])
@@ -73,7 +52,7 @@ function TrafficPolylines({ trafficSegments }) {
         if (pts.length < 2) return null
 
         const isHeavy   = seg.level === 'HEAVY'
-        const color     = isHeavy ? '#dc2626' : '#ea580c'  // merah vs orange
+        const color     = isHeavy ? '#dc2626' : '#ea580c'
         const haloColor = isHeavy ? '#7f1d1d' : '#7c2d12'
         const label     = isHeavy ? 'Macet Parah' : 'Macet Sedang'
         const delayMin  = Math.round((seg.delay || 0) / 60)
@@ -95,12 +74,10 @@ function TrafficPolylines({ trafficSegments }) {
 
         return (
           <React.Fragment key={`traffic_seg_${i}`}>
-            {/* Halo/shadow di belakang agar lebih terlihat */}
             <Polyline
               positions={pts}
               pathOptions={{ color: haloColor, weight: 14, opacity: 0.20 }}
             />
-            {/* Garis utama berwarna solid */}
             <Polyline
               positions={pts}
               pathOptions={{ color, weight: 7, opacity: 0.92 }}
@@ -114,16 +91,6 @@ function TrafficPolylines({ trafficSegments }) {
   )
 }
 
-// ─── CongestionLines ──────────────────────────────────────────────────────────
-// Mendukung DUA format data edge:
-//   Format A (dari admin manual): edge punya { polyline: [{lat, lng}, ...] }
-//   Format B (dari traffic_sync.py TomTom): edge hanya punya { u, v, lat?, lng? }
-//     → pada format B, kita gunakan titik tengah (lat/lng) sebagai titik tunggal
-//       dan render CircleMarker kecil sebagai penanda zona macet.
-//
-// MODERATE → orange gelap  #c2410c  putus renggang  14, 7
-// HEAVY    → orange merah  #9a3412  putus rapat      8, 5
-
 function CongestionLines({ cz }) {
   const heavy     = (cz.level || 'MODERATE') === 'HEAVY'
   const color     = heavy ? '#9a3412' : '#c2410c'
@@ -131,7 +98,6 @@ function CongestionLines({ cz }) {
   const label     = heavy ? 'Macet Parah' : 'Macet Sedang'
   const eta       = heavy ? 'ETA ~5× lebih lambat' : 'ETA ~2.5× lebih lambat'
 
-  //  badge sumber data (TomTom live vs manual admin)
   const isLive   = (cz.source || 'manual') === 'tomtom'
   const srcBadge = isLive
     ? <span style={{ fontSize: 10, fontWeight: 700, background: '#fef3c7', color: '#92400e', borderRadius: 4, padding: '1px 5px', marginLeft: 4 }}>🔴 LIVE</span>
@@ -169,7 +135,6 @@ function CongestionLines({ cz }) {
 
   return (
     <>
-      {/* Format A — Polyline putus-putus */}
       {polylineEdges.map(({ pts, ei }) => (
         <React.Fragment key={`cg_${cz.id}_line_${ei}`}>
           <Polyline
@@ -185,7 +150,6 @@ function CongestionLines({ cz }) {
         </React.Fragment>
       ))}
 
-      {/* Format B — CircleMarker titik tengah (dari TomTom sync 1 titik) */}
       {dotEdges.map(({ lat, lng, ei }) => (
         <React.Fragment key={`cg_${cz.id}_dot_${ei}`}>
           <CircleMarker
@@ -206,9 +170,6 @@ function CongestionLines({ cz }) {
   )
 }
 
-// ── TrafficDelaySummary — badge info kemacetan di sudut kiri bawah peta ──────
-// Muncul otomatis saat ada congestionZones aktif
-// Props: congestionZones (array), activeRoute (object dari routes[selectedMode])
 export function TrafficDelaySummary({ congestionZones, activeRoute }) {
   const activeCong    = (congestionZones || []).filter(cz => cz.is_active !== false)
   const heavyCount    = activeCong.filter(c => c.level === 'HEAVY').length
@@ -268,16 +229,12 @@ export default function MapLayers({
   ]
 
   const activeRoute = routes?.[selectedMode] || null
-
-  // 🔥 BARU: ambil traffic_segments dari rute aktif untuk render polyline warna
   const activeTrafficSegments = activeRoute?.traffic_segments || []
 
   return (
     <>
-      {/* Badge kemacetan di kiri bawah peta */}
       <TrafficDelaySummary congestionZones={congestionZones} activeRoute={activeRoute} />
 
-      {/* Posisi user */}
       {myPos && (
         <>
           <Marker position={[myPos.lat, myPos.lng]} icon={makeArrowIcon(bearing)}>
@@ -289,11 +246,9 @@ export default function MapLayers({
         </>
       )}
 
-      {/* Start / End markers */}
       {start && <Marker position={[start.lat, start.lng]} icon={makeStartIcon()}><Popup><b>Titik Awal</b></Popup></Marker>}
       {end && destinationType === null && <Marker position={[end.lat, end.lng]} icon={makeEndIcon()}><Popup><b>Tujuan</b></Popup></Marker>}
 
-      {/* Event marker */}
       {selectedEventId && (() => {
         const ev = events.find(e => String(e.id) === String(selectedEventId))
         if (!ev?.lat || !ev?.lng) return null
@@ -310,7 +265,6 @@ export default function MapLayers({
         )
       })()}
 
-      {/* Parkir markers */}
       {selectedEventId && spotsForSelectedEvent.map((spot) => {
         const isSel = destinationType === 'parking' && String(spot.id) === String(selectedParkingId)
         return (
@@ -344,14 +298,6 @@ export default function MapLayers({
         )
       })}
 
-      {/* ── LAYER ORDER (bawah ke atas): ──────────────────────────────────────────
-          1. Rute biru (bawah)
-          2. CongestionLines admin/tomtom flow (putus-putus)
-          3. TrafficPolylines sections TomTom (solid merah/orange)
-          4. Closure merah solid (paling atas)
-      ── */}
-
-      {/* 1. Rute biru */}
       {routeCfg.map(({ key, route, activeColor, tooltip }) => {
         if (!route?.polyline) return null
         const isActive = selectedMode === key
@@ -377,17 +323,14 @@ export default function MapLayers({
         )
       })}
 
-      {/* 2. CongestionLines — orange gelap putus-putus / titik (dari Supabase congestion_zones) */}
-      {Array.isArray(congestionZones) && congestionZones.map((cz) => (
-        <CongestionLines key={`cz_${cz.id}`} cz={cz} />
-      ))}
+      {Array.isArray(congestionZones) && congestionZones
+        .filter(cz => cz?.is_active !== false)
+        .map((cz) => (
+          <CongestionLines key={`cz_${cz.id}`} cz={cz} />
+        ))}
 
-      {/* 🔥 3. TrafficPolylines — garis solid merah/orange dari TomTom sections
-              Di-render di atas rute biru dan CongestionLines agar langsung terlihat.
-              Hanya muncul pada rute yang sedang aktif (selectedMode). */}
       <TrafficPolylines trafficSegments={activeTrafficSegments} />
 
-      {/* 4. Closure — merah solid, paling atas */}
       {closures.map((c) => {
         const positions = (c.edges || [])
           .map(e => Array.isArray(e.polyline) ? e.polyline.map(p => [p.lat, p.lng]) : null)
@@ -408,7 +351,6 @@ export default function MapLayers({
         )
       })}
 
-      {/* Next step marker */}
       {tracking && nextStep?.location && (
         <CircleMarker center={[nextStep.location.lat, nextStep.location.lng]} radius={6} pathOptions={{ color: '#10b981' }}>
           <Popup><b>Step berikutnya</b><br />{nextStep.instruction || '-'}</Popup>
