@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import {
@@ -68,70 +69,172 @@ const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm tex
 
 // ─── Modal: Form Event ────────────────────────────────────────────────────────
 function EventModal({ editingId, formData, markerPos, onChange, onMapPick, onSubmit, onClose, saving }) {
-  return (
-    <div className="fixed inset-0 bg-black/40 z-[500] flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-base font-bold text-gray-900">
+  // Lock body scroll saat modal terbuka
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
+  const modal = (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 99999,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+      }}
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      {/* Kotak modal */}
+      <div style={{
+        background: '#fff',
+        borderRadius: 16,
+        boxShadow: '0 25px 60px rgba(0,0,0,0.25)',
+        width: '100%',
+        maxWidth: 960,
+        height: '88vh',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}>
+        {/* ── Header ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 24px', borderBottom: '1px solid #f0f0f0', flexShrink: 0,
+        }}>
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111' }}>
             {editingId ? 'Edit Event' : 'Tambah Event Baru'}
           </h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 transition">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+          <button
+            onClick={onClose}
+            style={{
+              width: 32, height: 32, borderRadius: 8, border: 'none', background: 'transparent',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#9ca3af', fontSize: 18, lineHeight: 1,
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            ✕
           </button>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
-          <div className="p-6 space-y-4 lg:col-span-1">
-            <Field label="Nama Event" required>
-              <input type="text" name="name" value={formData.name} onChange={onChange}
-                placeholder="Nama event" className={inputCls} />
-            </Field>
-            <Field label="Deskripsi">
-              <textarea name="description" value={formData.description} onChange={onChange}
-                placeholder="Deskripsi singkat" rows={3} className={inputCls} />
-            </Field>
-            <Field label="Lokasi">
-              <input type="text" name="location" value={formData.location} onChange={onChange}
-                placeholder="Nama lokasi" className={inputCls} />
-            </Field>
-            <Field label="Waktu Mulai" required>
-              <input type="datetime-local" name="start_time" value={formData.start_time} onChange={onChange} className={inputCls} />
-            </Field>
-            <Field label="Waktu Selesai">
-              <input type="datetime-local" name="end_time" value={formData.end_time} onChange={onChange} className={inputCls} />
-            </Field>
-            <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-              <p className="text-xs font-semibold text-gray-500 mb-0.5">Koordinat Event</p>
-              <p className="text-xs text-gray-700 font-mono">{markerPos.lat.toFixed(5)}, {markerPos.lng.toFixed(5)}</p>
-              <p className="text-[10px] text-gray-400 mt-1">Klik peta untuk ubah lokasi pin</p>
+
+        {/* ── Body ── */}
+        <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+
+          {/* Panel kiri: form */}
+          <div style={{
+            width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column',
+            borderRight: '1px solid #f0f0f0',
+          }}>
+            {/* scroll area */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 0 20px' }}>
+              <div style={{ marginBottom: 14 }}>
+                <label style={lblStyle}>Nama Event <span style={{ color: '#ef4444' }}>*</span></label>
+                <input type="text" name="name" value={formData.name} onChange={onChange}
+                  placeholder="Nama event" style={inpStyle} />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={lblStyle}>Deskripsi</label>
+                <textarea name="description" value={formData.description} onChange={onChange}
+                  placeholder="Deskripsi singkat" rows={3}
+                  style={{ ...inpStyle, resize: 'vertical', minHeight: 70 }} />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={lblStyle}>Lokasi</label>
+                <input type="text" name="location" value={formData.location} onChange={onChange}
+                  placeholder="Nama lokasi" style={inpStyle} />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={lblStyle}>Waktu Mulai <span style={{ color: '#ef4444' }}>*</span></label>
+                <input type="datetime-local" name="start_time" value={formData.start_time}
+                  onChange={onChange} style={inpStyle} />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={lblStyle}>Waktu Selesai</label>
+                <input type="datetime-local" name="end_time" value={formData.end_time}
+                  onChange={onChange} style={inpStyle} />
+              </div>
+              <div style={{
+                background: '#f9fafb', borderRadius: 8, padding: '10px 12px',
+                border: '1px solid #e5e7eb', marginBottom: 8,
+              }}>
+                <p style={{ margin: '0 0 2px', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Koordinat Event</p>
+                <p style={{ margin: '0 0 4px', fontSize: 12, fontFamily: 'monospace', color: '#374151' }}>
+                  {markerPos.lat.toFixed(5)}, {markerPos.lng.toFixed(5)}
+                </p>
+                <p style={{ margin: 0, fontSize: 10, color: '#9ca3af' }}>Klik peta untuk ubah lokasi pin</p>
+              </div>
             </div>
-            <div className="flex gap-2 pt-1">
-              <button type="button" onClick={onClose}
-                className="flex-1 px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
-                Batal
-              </button>
-              <button type="button" onClick={onSubmit} disabled={saving}
-                className={`flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg transition
-                  ${saving ? 'bg-gray-400 cursor-not-allowed' : 'bg-gray-900 hover:bg-gray-800'}`}>
+
+            {/* Tombol — sticky bawah */}
+            <div style={{
+              flexShrink: 0, padding: '14px 20px',
+              borderTop: '1px solid #f0f0f0', display: 'flex', gap: 8,
+            }}>
+              <button type="button" onClick={onClose} style={{
+                flex: 1, padding: '9px 0', fontSize: 13, fontWeight: 600,
+                color: '#374151', background: '#f3f4f6', border: 'none',
+                borderRadius: 8, cursor: 'pointer',
+              }}>Batal</button>
+              <button type="button" onClick={onSubmit} disabled={saving} style={{
+                flex: 1, padding: '9px 0', fontSize: 13, fontWeight: 600,
+                color: '#fff', background: saving ? '#9ca3af' : '#111827',
+                border: 'none', borderRadius: 8,
+                cursor: saving ? 'not-allowed' : 'pointer',
+              }}>
                 {saving ? 'Menyimpan...' : 'Simpan Event'}
               </button>
             </div>
           </div>
-          <div className="lg:col-span-2 p-4">
-            <p className="text-xs font-semibold text-gray-500 mb-2">Klik peta untuk pin lokasi event (merah)</p>
-            <MapContainer center={[markerPos.lat, markerPos.lng]} zoom={14} className="h-[420px] w-full rounded-lg border border-gray-200">
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
-              <MapPicker onPick={onMapPick} />
-              <Marker position={[markerPos.lat, markerPos.lng]}>
-                <Popup>Lokasi Event<br />{markerPos.lat.toFixed(5)}, {markerPos.lng.toFixed(5)}</Popup>
-              </Marker>
-            </MapContainer>
+
+          {/* Panel kanan: peta */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 14, minWidth: 0 }}>
+            <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 600, color: '#6b7280', flexShrink: 0 }}>
+              Klik peta untuk pin lokasi event
+            </p>
+            <div style={{ flex: 1, borderRadius: 10, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+              <MapContainer
+                center={[markerPos.lat, markerPos.lng]}
+                zoom={14}
+                style={{ height: '100%', width: '100%' }}
+              >
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution="&copy; OpenStreetMap contributors"
+                />
+                <MapPicker onPick={onMapPick} />
+                <Marker position={[markerPos.lat, markerPos.lng]}>
+                  <Popup>
+                    Lokasi Event<br />
+                    {markerPos.lat.toFixed(5)}, {markerPos.lng.toFixed(5)}
+                  </Popup>
+                </Marker>
+              </MapContainer>
+            </div>
           </div>
         </div>
       </div>
     </div>
   )
+
+  // Render ke document.body agar bebas dari stacking context navbar
+  return createPortal(modal, document.body)
+}
+
+// ── Style helpers untuk modal ──────────────────────────────────────────────────
+const lblStyle = {
+  display: 'block', fontSize: 11, fontWeight: 600, color: '#6b7280',
+  textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4,
+}
+const inpStyle = {
+  width: '100%', padding: '8px 10px', fontSize: 13, color: '#111827',
+  border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none',
+  background: '#fff', boxSizing: 'border-box',
 }
 
 // ─── Modal: Kelola Parkir ─────────────────────────────────────────────────────
