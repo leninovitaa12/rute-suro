@@ -3,32 +3,59 @@ import dayjs from 'dayjs'
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import Swal from 'sweetalert2'
-import { api } from '../../lib/api'
 
-// ── API helpers — FastAPI endpoints ──────────────────────────────────────────
-const getClosures = async (active = false) => {
-  const { data } = await api.get('/road-closures' + (active ? '?active=true' : ''))
+// ── Import semua dari backendApi (Supabase) ───────────────────────────────────
+import {
+  getEvents,
+  getClosures,
+  createClosure,
+  updateClosure,
+  deleteClosure,
+  deriveEdges,
+} from '../../lib/backendApi'
+
+// ── Import Supabase langsung untuk congestion_zones ───────────────────────────
+import { supabase } from '../../lib/supabase'
+
+// ── Congestion API helpers (langsung ke Supabase, source=manual) ──────────────
+const getCongestions = async () => {
+  const { data, error } = await supabase
+    .from('congestion_zones')
+    .select('*')
+    .eq('source', 'manual')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+const createCongestion = async (body) => {
+  const { data, error } = await supabase
+    .from('congestion_zones')
+    .insert([{ ...body, source: 'manual' }])
+    .select()
+    .single()
+  if (error) throw error
   return data
 }
-const getEvents = async () => {
-  const { data } = await api.get('/events')
+
+const updateCongestionById = async (id, body) => {
+  const { data, error } = await supabase
+    .from('congestion_zones')
+    .update({ ...body, source: 'manual' })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
   return data
 }
-const deriveEdges = async (latA, lngA, latB, lngB) => {
-  const { data } = await api.post('/admin/derive-edges', { a: { lat: latA, lng: lngA }, b: { lat: latB, lng: lngB } })
-  return data
-}
-const createClosure = async (body) => {
-  const { data } = await api.post('/road-closures', body)
-  return data
-}
-const updateClosure = async (id, body) => {
-  const { data } = await api.put('/road-closures/' + id, body)
-  return data
-}
-const deleteClosure = async (id) => {
-  const { data } = await api.delete('/road-closures/' + id)
-  return data
+
+const deleteCongestionById = async (id) => {
+  const { error } = await supabase
+    .from('congestion_zones')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+  return true
 }
 
 const DEFAULT_CENTER = [-7.871, 111.462]
@@ -40,19 +67,11 @@ L.Icon.Default.mergeOptions({
   shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-const mockEvents = [
-  { id: 1, name: 'Kirab Pusaka Grebeg Suro', start_time: '2024-08-01T08:00:00', end_time: '2024-08-01T12:00:00', lat: -7.871, lng: 111.462 },
-  { id: 2, name: 'Festival Reog',            start_time: '2024-08-02T10:00:00', end_time: '2024-08-02T16:00:00', lat: -7.873, lng: 111.465 },
-]
-const mockClosures = [
-  { id: 1, event_id: 1, type: 'CLOSED', reason: 'Jalur kirab pusaka', start_time: '2024-08-01T07:00:00', end_time: '2024-08-01T13:00:00', edges: [{ polyline: [{ lat:-7.871,lng:111.462 },{ lat:-7.872,lng:111.463 },{ lat:-7.873,lng:111.464 }] }], created_at: '2024-07-20T10:00:00' },
-]
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const toIso   = v => { const d = new Date(v); return isNaN(d) ? null : d.toISOString() }
-const swal    = (icon, title, opts = {}) => Swal.fire({ icon, title, confirmButtonColor: icon === 'success' ? '#16a34a' : icon === 'error' ? '#dc2626' : '#2563eb', confirmButtonText: icon === 'error' ? 'Tutup' : 'OK', ...opts })
-const swalOK  = (title, text) => swal('success', title, { text, timer: 3000, timerProgressBar: true })
-const swalErr = (title, text) => swal('error', title, { text: text || 'Terjadi kesalahan.' })
+const swalFn  = (icon, title, opts = {}) => Swal.fire({ icon, title, confirmButtonColor: icon === 'success' ? '#16a34a' : icon === 'error' ? '#dc2626' : '#2563eb', confirmButtonText: icon === 'error' ? 'Tutup' : 'OK', ...opts })
+const swalOK  = (title, text) => swalFn('success', title, { text, timer: 3000, timerProgressBar: true })
+const swalErr = (title, text) => swalFn('error', title, { text: text || 'Terjadi kesalahan.' })
 const swalDel = name => Swal.fire({ icon: 'warning', title: 'Hapus data ini?', html: `<span style="color:#374151;font-size:14px"><b>${name}</b> akan dihapus permanen.</span>`, showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', reverseButtons: true })
 
 // ─── MapPicker ────────────────────────────────────────────────────────────────
@@ -79,7 +98,7 @@ function useEdgePicker() {
     else { setPickA(p); setPickB(null); setEdges([]) }
   }
   const derive = async () => {
-    if (!pickA || !pickB) { swal('info', 'Perlu 2 titik', { text: 'Klik 2 titik di peta (A lalu B).' }); return }
+    if (!pickA || !pickB) { swalFn('info', 'Perlu 2 titik', { text: 'Klik 2 titik di peta (A lalu B).' }); return }
     try {
       const e = await deriveEdges(pickA.lat, pickA.lng, pickB.lat, pickB.lng)
       setEdges(e || [])
@@ -87,7 +106,7 @@ function useEdgePicker() {
     } catch {
       const fallback = [{ polyline: [pickA, { lat:(pickA.lat+pickB.lat)/2, lng:(pickA.lng+pickB.lng)/2 }, pickB] }]
       setEdges(fallback)
-      swal('info', 'Fallback Mode', { text: 'Server tidak merespons. Menggunakan garis lurus.' })
+      swalFn('info', 'Fallback Mode', { text: 'Server tidak merespons. Menggunakan garis lurus.' })
     }
   }
   return { pickA, pickB, edges, setEdges, reset, onMapClick, derive }
@@ -140,8 +159,7 @@ function HistoryRow({ item, editingId, onEdit, onDelete, badgeClass, badgeLabel,
   )
 }
 
-// ─── Tinggi map & form: konstanta tunggal ─────────────────────────────────────
-// Ubah nilai ini jika ingin map lebih tinggi/pendek
+// ─── Tinggi map ───────────────────────────────────────────────────────────────
 const MAP_HEIGHT = 620
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -153,6 +171,8 @@ export default function AdminTraffic() {
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState(null)
   const [saving,    setSaving]    = useState(false)
+
+  // event_id disimpan sebagai string UUID (bukan integer)
   const EMPTY_CL = { id: null, event_id: '', type: 'CLOSED', reason: '', start_time: '', end_time: '' }
   const [clForm, setClForm] = useState(EMPTY_CL)
   const clPicker = useEdgePicker()
@@ -164,22 +184,34 @@ export default function AdminTraffic() {
   const [cgForm, setCgForm] = useState(EMPTY_CG)
   const cgPicker = useEdgePicker()
 
+  // ── Load closures + events dari Supabase ──────────────────────────────────
   useEffect(() => {
     ;(async () => {
       try {
+        // getClosures() dari backendApi sudah ke Supabase
+        // getEvents() dari backendApi sudah ke Supabase
         const [cl, ev] = await Promise.all([getClosures(false), getEvents()])
-        setClosures(cl || []); setEvents(ev || [])
-      } catch {
-        setError('Tidak dapat terhubung ke server. Menampilkan data contoh.')
-        setClosures([...mockClosures]); setEvents([...mockEvents])
-      } finally { setLoading(false) }
+        setClosures(cl || [])
+        setEvents(ev || [])
+      } catch (err) {
+        console.error('[AdminTraffic] load error:', err)
+        setError('Tidak dapat memuat data. Periksa koneksi Supabase.')
+        setClosures([])
+        setEvents([])
+      } finally {
+        setLoading(false)
+      }
     })()
   }, [])
 
+  // ── Load congestions (source=manual) dari Supabase ────────────────────────
   useEffect(() => {
-    api.get('/congestion-zones')
-      .then(r => setCongestions(r.data || []))
-      .catch(() => setCongestions([]))
+    getCongestions()
+      .then(data => setCongestions(data || []))
+      .catch(err => {
+        console.error('[AdminTraffic] congestion load error:', err)
+        setCongestions([])
+      })
       .finally(() => setLoadingCong(false))
   }, [])
 
@@ -189,7 +221,16 @@ export default function AdminTraffic() {
   const saveClosure = async () => {
     if (!clPicker.edges.length) { swalErr('Ruas Jalan Kosong', 'Klik 2 titik lalu tekan Derive.'); return }
     setSaving(true)
-    const p = { event_id: clForm.event_id || null, type: clForm.type, reason: clForm.reason || null, start_time: toIso(clForm.start_time), end_time: toIso(clForm.end_time), edges: clPicker.edges, created_at: new Date().toISOString() }
+    const p = {
+      // event_id tetap string UUID atau null — jangan parseInt!
+      event_id:   clForm.event_id || null,
+      type:       clForm.type,
+      reason:     clForm.reason || null,
+      start_time: toIso(clForm.start_time),
+      end_time:   toIso(clForm.end_time),
+      edges:      clPicker.edges,
+      is_active:  true,
+    }
     try {
       if (clForm.id) {
         const u = await updateClosure(clForm.id, p)
@@ -201,21 +242,37 @@ export default function AdminTraffic() {
         await swalOK('Berhasil Disimpan!', 'Rekayasa baru berhasil ditambahkan.')
       }
       resetCl()
-    } catch (e) { swalErr('Gagal Menyimpan', e?.message) }
-    finally { setSaving(false) }
+    } catch (e) {
+      const msg = e?.message || 'Terjadi kesalahan.'
+      swalErr('Gagal Menyimpan', msg)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const editClosure = c => {
-    setClForm({ id: c.id, event_id: c.event_id||'', type: c.type||'CLOSED', reason: c.reason||'', start_time: c.start_time?.slice(0,16)||'', end_time: c.end_time?.slice(0,16)||'' })
+    setClForm({
+      id:         c.id,
+      event_id:   c.event_id || '',
+      type:       c.type || 'CLOSED',
+      reason:     c.reason || '',
+      start_time: c.start_time?.slice(0, 16) || '',
+      end_time:   c.end_time?.slice(0, 16)   || '',
+    })
     clPicker.setEdges(c.edges || [])
-    setTimeout(() => document.getElementById('closure-form')?.scrollIntoView({ behavior:'smooth', block:'start' }), 100)
+    setTimeout(() => document.getElementById('closure-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
   }
 
   const deleteCl = async c => {
-    const r = await swalDel(`${c.type}${c.reason ? ' - '+c.reason : ''}`)
+    const r = await swalDel(`${c.type}${c.reason ? ' - ' + c.reason : ''}`)
     if (!r.isConfirmed) return
-    try { await deleteClosure(c.id); setClosures(p => p.filter(x => x.id !== c.id)); await swalOK('Berhasil Dihapus!', '') }
-    catch (e) { swalErr('Gagal Menghapus', e?.message) }
+    try {
+      await deleteClosure(c.id)
+      setClosures(p => p.filter(x => x.id !== c.id))
+      await swalOK('Berhasil Dihapus!', 'Data rekayasa telah dihapus.')
+    } catch (e) {
+      swalErr('Gagal Menghapus', e?.message)
+    }
   }
 
   // ── Congestion CRUD ───────────────────────────────────────────────────────
@@ -224,33 +281,62 @@ export default function AdminTraffic() {
   const saveCongestion = async () => {
     if (!cgPicker.edges.length) { swalErr('Ruas Jalan Kosong', 'Klik 2 titik lalu tekan Derive.'); return }
     setCgSaving(true)
-    const p = { event_id: cgForm.event_id||null, level: cgForm.level, reason: cgForm.reason||null, start_time: toIso(cgForm.start_time), end_time: toIso(cgForm.end_time), edges: cgPicker.edges }
+    const p = {
+      // event_id tetap string UUID atau null — jangan parseInt!
+      event_id:   cgForm.event_id || null,
+      level:      cgForm.level,
+      reason:     cgForm.reason || null,
+      start_time: toIso(cgForm.start_time),
+      end_time:   toIso(cgForm.end_time),
+      edges:      cgPicker.edges,
+      is_active:  true,
+    }
     try {
       if (cgForm.id) {
-        const r = await api.put(`/congestion-zones/${cgForm.id}`, p)
-        setCongestions(prev => prev.map(c => c.id === cgForm.id ? r.data : c))
+        const updated = await updateCongestionById(cgForm.id, p)
+        setCongestions(prev => prev.map(c => c.id === cgForm.id ? updated : c))
         await swalOK('Berhasil Diperbarui!', 'Zona kemacetan diperbarui.')
       } else {
-        const r = await api.post('/congestion-zones', p)
-        setCongestions(prev => [r.data, ...prev])
+        const created = await createCongestion(p)
+        setCongestions(prev => [created, ...prev])
         await swalOK('Berhasil Disimpan!', 'Zona kemacetan ditambahkan.')
       }
       resetCg()
-    } catch (e) { swalErr('Gagal Menyimpan', e?.message) }
-    finally { setCgSaving(false) }
+    } catch (e) {
+      const msg = e?.message || 'Terjadi kesalahan.'
+      swalErr('Gagal Menyimpan', msg)
+    } finally {
+      setCgSaving(false)
+    }
   }
 
   const editCongestion = cg => {
-    setCgForm({ id: cg.id, event_id: cg.event_id||'', level: cg.level||'MODERATE', reason: cg.reason||'', start_time: cg.start_time?.slice(0,16)||'', end_time: cg.end_time?.slice(0,16)||'' })
+    if (cg.source && cg.source !== 'manual') {
+      swalErr('Tidak Dapat Diedit', 'Hanya zona kemacetan manual yang dapat diedit.')
+      return
+    }
+    setCgForm({
+      id:         cg.id,
+      event_id:   cg.event_id || '',
+      level:      cg.level    || 'MODERATE',
+      reason:     cg.reason   || '',
+      start_time: cg.start_time?.slice(0, 16) || '',
+      end_time:   cg.end_time?.slice(0, 16)   || '',
+    })
     cgPicker.setEdges(cg.edges || [])
-    setTimeout(() => document.getElementById('congestion-form')?.scrollIntoView({ behavior:'smooth', block:'start' }), 100)
+    setTimeout(() => document.getElementById('congestion-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
   }
 
   const deleteCg = async cg => {
-    const r = await swalDel(cg.reason || cg.level)
+    const r = await swalDel(`${cg.level} - ${cg.reason || 'Zona Kemacetan'}`)
     if (!r.isConfirmed) return
-    try { await api.delete(`/congestion-zones/${cg.id}`); setCongestions(p => p.filter(x => x.id !== cg.id)); await swalOK('Berhasil Dihapus!', '') }
-    catch (e) { swalErr('Gagal Menghapus', e?.message) }
+    try {
+      await deleteCongestionById(cg.id)
+      setCongestions(p => p.filter(x => x.id !== cg.id))
+      await swalOK('Berhasil Dihapus!', 'Zona kemacetan telah dihapus.')
+    } catch (e) {
+      swalErr('Gagal Menghapus', e?.message)
+    }
   }
 
   const fcl = 'focus:ring-red-500/20 focus:border-red-400'
@@ -286,15 +372,9 @@ export default function AdminTraffic() {
       {/* ══ CLOSURE ══════════════════════════════════════════════════════════ */}
       {activeTab === 'closure' && (
         <>
-          {/*
-            Layout: flex row, tinggi FIXED = MAP_HEIGHT
-            - Form kiri: lebar 300px, overflow-y scroll
-            - Map kanan: flex-1, tinggi persis MAP_HEIGHT
-            Keduanya dalam container tinggi MAP_HEIGHT → selalu pas, tidak bocor
-          */}
           <div id="closure-form" className="flex gap-5 rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white" style={{ height: MAP_HEIGHT }}>
 
-            {/* Form — scroll internal jika konten melebihi tinggi */}
+            {/* Form */}
             <div className="overflow-y-auto p-6 space-y-4 border-r border-gray-100" style={{ width: 300, flexShrink: 0 }}>
               <div className="flex items-center justify-between">
                 <div>
@@ -308,23 +388,39 @@ export default function AdminTraffic() {
                 )}
               </div>
 
-              <div><Lbl text="Terkait Event" /><Sel value={clForm.event_id} onChange={e=>setClForm({...clForm,event_id:e.target.value})} cls={fcl}><option value="">-- Pilih Event (opsional) --</option>{events.map(ev=><option key={ev.id} value={ev.id}>{ev.name}</option>)}</Sel></div>
-              <div><Lbl text="Tipe Rekayasa" /><Sel value={clForm.type} onChange={e=>setClForm({...clForm,type:e.target.value})} cls={fcl}><option value="CLOSED">CLOSED (Jalan Ditutup)</option><option value="DIVERSION">DIVERSION (Dialihkan)</option></Sel></div>
-              <div><Lbl text="Alasan Rekayasa" /><Inp value={clForm.reason} onChange={e=>setClForm({...clForm,reason:e.target.value})} placeholder="Contoh: Kirab pusaka" cls={fcl} /></div>
-              <div><Lbl text="Waktu Mulai" /><DtIn value={clForm.start_time} onChange={e=>setClForm({...clForm,start_time:e.target.value})} cls={fcl} /></div>
-              <div><Lbl text="Waktu Selesai" /><DtIn value={clForm.end_time} onChange={e=>setClForm({...clForm,end_time:e.target.value})} cls={fcl} /></div>
+              {/* ── Dropdown Event: list dari Supabase ── */}
+              <div>
+                <Lbl text="Terkait Event" />
+                <Sel value={clForm.event_id} onChange={e => setClForm({ ...clForm, event_id: e.target.value })} cls={fcl}>
+                  <option value="">-- Pilih Event (opsional) --</option>
+                  {events.map(ev => (
+                    <option key={ev.id} value={ev.id}>{ev.name}</option>
+                  ))}
+                </Sel>
+              </div>
+
+              <div>
+                <Lbl text="Tipe Rekayasa" />
+                <Sel value={clForm.type} onChange={e => setClForm({ ...clForm, type: e.target.value })} cls={fcl}>
+                  <option value="CLOSED">CLOSED (Jalan Ditutup)</option>
+                  <option value="DIVERSION">DIVERSION (Dialihkan)</option>
+                </Sel>
+              </div>
+
+              <div><Lbl text="Alasan Rekayasa" /><Inp value={clForm.reason} onChange={e => setClForm({ ...clForm, reason: e.target.value })} placeholder="Contoh: Kirab pusaka" cls={fcl} /></div>
+              <div><Lbl text="Waktu Mulai" /><DtIn value={clForm.start_time} onChange={e => setClForm({ ...clForm, start_time: e.target.value })} cls={fcl} /></div>
+              <div><Lbl text="Waktu Selesai" /><DtIn value={clForm.end_time} onChange={e => setClForm({ ...clForm, end_time: e.target.value })} cls={fcl} /></div>
 
               <PickerPanel pickA={clPicker.pickA} pickB={clPicker.pickB} edges={clPicker.edges} onDerive={clPicker.derive} onReset={clPicker.reset} accentColor="bg-blue-600" />
 
               <button onClick={saveClosure} disabled={saving}
-                className={`w-full px-4 py-3 font-bold text-sm rounded-lg transition ${saving?'bg-gray-300 text-gray-500 cursor-not-allowed':clForm.id?'bg-blue-600 hover:bg-blue-700 text-white':'bg-red-600 hover:bg-red-700 text-white'}`}>
+                className={`w-full px-4 py-3 font-bold text-sm rounded-lg transition ${saving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : clForm.id ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}>
                 {saving ? 'Menyimpan...' : clForm.id ? '✏️ Update Rekayasa' : '➕ Simpan Rekayasa'}
               </button>
             </div>
 
-            {/* Map — flex-1, tinggi diwarisi dari parent (MAP_HEIGHT) */}
+            {/* Map */}
             <div className="flex-1 flex flex-col min-w-0" style={{ isolation: 'isolate' }}>
-              {/* Map header */}
               <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
                 <p className="text-sm font-semibold text-gray-700">Peta Rekayasa Lalu Lintas</p>
                 <div className="flex items-center gap-3 text-xs text-gray-500">
@@ -332,7 +428,6 @@ export default function AdminTraffic() {
                   <span className="flex items-center gap-1.5"><span className="w-4 h-1.5 bg-orange-400 rounded inline-block"/>Dialihkan</span>
                 </div>
               </div>
-              {/* MapContainer mengisi sisa tinggi (parent flex-col, ini flex-1) */}
               <div className="flex-1" style={{ position: 'relative', zIndex: 0, minHeight: 0 }}>
                 <MapContainer
                   center={DEFAULT_CENTER}
@@ -343,15 +438,17 @@ export default function AdminTraffic() {
                   <MapPicker onPick={clPicker.onMapClick} />
                   {clPicker.pickA && <Marker position={[clPicker.pickA.lat, clPicker.pickA.lng]}><Popup><b>Titik A</b></Popup></Marker>}
                   {clPicker.pickB && <Marker position={[clPicker.pickB.lat, clPicker.pickB.lng]}><Popup><b>Titik B</b></Popup></Marker>}
-                  {clPicker.edges.map((e,i) => <Polyline key={'d'+i} positions={e.polyline.map(p=>[p.lat,p.lng])} pathOptions={{ color: clForm.type==='CLOSED'?'red':'orange', weight:6, opacity:.85 }} />)}
-                  {closures.flatMap(c => (c.edges||[]).map((e,i) => (
-                    <Polyline key={c.id+'_'+i} positions={e.polyline.map(p=>[p.lat,p.lng])} pathOptions={{ color:c.type==='CLOSED'?'red':'orange', weight:4, opacity:.6 }}>
+                  {clPicker.edges.map((e, i) => (
+                    <Polyline key={'d' + i} positions={e.polyline.map(p => [p.lat, p.lng])} pathOptions={{ color: clForm.type === 'CLOSED' ? 'red' : 'orange', weight: 6, opacity: .85 }} />
+                  ))}
+                  {closures.flatMap(c => (c.edges || []).map((e, i) => (
+                    <Polyline key={c.id + '_' + i} positions={e.polyline.map(p => [p.lat, p.lng])} pathOptions={{ color: c.type === 'CLOSED' ? 'red' : 'orange', weight: 4, opacity: .6 }}>
                       <Popup>
-                        <p style={{fontWeight:'bold',marginBottom:4}}>{c.type}</p>
-                        <p style={{fontSize:12,color:'#555',marginBottom:8}}>{c.reason||'—'}</p>
-                        <div style={{display:'flex',gap:6}}>
-                          <button onClick={()=>editClosure(c)} style={{flex:1,padding:'4px 8px',background:'#2563eb',color:'white',border:'none',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>Edit</button>
-                          <button onClick={()=>deleteCl(c)} style={{flex:1,padding:'4px 8px',background:'#dc2626',color:'white',border:'none',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>Hapus</button>
+                        <p style={{ fontWeight: 'bold', marginBottom: 4 }}>{c.type}</p>
+                        <p style={{ fontSize: 12, color: '#555', marginBottom: 8 }}>{c.reason || '—'}</p>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => editClosure(c)} style={{ flex: 1, padding: '4px 8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Edit</button>
+                          <button onClick={() => deleteCl(c)} style={{ flex: 1, padding: '4px 8px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Hapus</button>
                         </div>
                       </Popup>
                     </Polyline>
@@ -375,7 +472,7 @@ export default function AdminTraffic() {
               <div className="divide-y divide-gray-50">
                 {closures.map(c => (
                   <HistoryRow key={c.id} item={c} editingId={clForm.id} onEdit={editClosure} onDelete={deleteCl}
-                    badgeClass={c.type==='CLOSED'?'bg-red-100 text-red-700':'bg-orange-100 text-orange-700'}
+                    badgeClass={c.type === 'CLOSED' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}
                     badgeLabel={c.type} />
                 ))}
               </div>
@@ -392,6 +489,7 @@ export default function AdminTraffic() {
             <div>
               <p className="font-bold mb-0.5">Tentang Zona Kemacetan</p>
               <p className="text-xs text-orange-800 leading-relaxed">Jalan macet <b>tetap bisa dilewati</b> — A* memberi bobot lebih tinggi. Ditampilkan <span className="font-bold text-orange-600">garis oranye</span> di peta pengguna. <b>MODERATE</b> = 2.5× lebih lambat, <b>HEAVY</b> = 5× lebih lambat.</p>
+              <p className="text-xs text-orange-700 font-semibold mt-1">📋 Halaman ini hanya menampilkan kemacetan yang diinput manual oleh admin. Data realtime TomTom dikelola otomatis oleh sistem.</p>
             </div>
           </div>
 
@@ -411,23 +509,34 @@ export default function AdminTraffic() {
                 )}
               </div>
 
-              <div><Lbl text="Terkait Event" /><Sel value={cgForm.event_id} onChange={e=>setCgForm({...cgForm,event_id:e.target.value})} cls={fcg}><option value="">-- Pilih Event (opsional) --</option>{events.map(ev=><option key={ev.id} value={ev.id}>{ev.name}</option>)}</Sel></div>
+              {/* ── Dropdown Event: list dari Supabase ── */}
+              <div>
+                <Lbl text="Terkait Event" />
+                <Sel value={cgForm.event_id} onChange={e => setCgForm({ ...cgForm, event_id: e.target.value })} cls={fcg}>
+                  <option value="">-- Pilih Event (opsional) --</option>
+                  {events.map(ev => (
+                    <option key={ev.id} value={ev.id}>{ev.name}</option>
+                  ))}
+                </Sel>
+              </div>
+
               <div>
                 <Lbl text="Level Kemacetan" />
-                <Sel value={cgForm.level} onChange={e=>setCgForm({...cgForm,level:e.target.value})} cls={fcg}>
+                <Sel value={cgForm.level} onChange={e => setCgForm({ ...cgForm, level: e.target.value })} cls={fcg}>
                   <option value="MODERATE">MODERATE — Macet Sedang (ETA 2.5×)</option>
                   <option value="HEAVY">HEAVY — Macet Parah (ETA 5×)</option>
                 </Sel>
                 <p className="mt-1 text-[11px] text-gray-400">A* akan menghindari jika ada jalur alternatif lebih cepat.</p>
               </div>
-              <div><Lbl text="Keterangan" /><Inp value={cgForm.reason} onChange={e=>setCgForm({...cgForm,reason:e.target.value})} placeholder="Contoh: Antrian kirab, pasar malam" cls={fcg} /></div>
-              <div><Lbl text="Waktu Mulai" /><DtIn value={cgForm.start_time} onChange={e=>setCgForm({...cgForm,start_time:e.target.value})} cls={fcg} /></div>
-              <div><Lbl text="Waktu Selesai" /><DtIn value={cgForm.end_time} onChange={e=>setCgForm({...cgForm,end_time:e.target.value})} cls={fcg} /></div>
+
+              <div><Lbl text="Keterangan" /><Inp value={cgForm.reason} onChange={e => setCgForm({ ...cgForm, reason: e.target.value })} placeholder="Contoh: Antrian kirab, pasar malam" cls={fcg} /></div>
+              <div><Lbl text="Waktu Mulai" /><DtIn value={cgForm.start_time} onChange={e => setCgForm({ ...cgForm, start_time: e.target.value })} cls={fcg} /></div>
+              <div><Lbl text="Waktu Selesai" /><DtIn value={cgForm.end_time} onChange={e => setCgForm({ ...cgForm, end_time: e.target.value })} cls={fcg} /></div>
 
               <PickerPanel pickA={cgPicker.pickA} pickB={cgPicker.pickB} edges={cgPicker.edges} onDerive={cgPicker.derive} onReset={cgPicker.reset} accentColor="bg-orange-500" />
 
               <button onClick={saveCongestion} disabled={cgSaving}
-                className={`w-full px-4 py-3 font-bold text-sm rounded-lg transition ${cgSaving?'bg-gray-300 text-gray-500 cursor-not-allowed':cgForm.id?'bg-blue-600 hover:bg-blue-700 text-white':'bg-orange-500 hover:bg-orange-600 text-white'}`}>
+                className={`w-full px-4 py-3 font-bold text-sm rounded-lg transition ${cgSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : cgForm.id ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-orange-500 hover:bg-orange-600 text-white'}`}>
                 {cgSaving ? 'Menyimpan...' : cgForm.id ? '✏️ Update Zona Macet' : '➕ Simpan Zona Macet'}
               </button>
             </div>
@@ -435,7 +544,7 @@ export default function AdminTraffic() {
             {/* Map */}
             <div className="flex-1 flex flex-col min-w-0" style={{ isolation: 'isolate' }}>
               <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-                <p className="text-sm font-semibold text-gray-700">Peta Zona Kemacetan</p>
+                <p className="text-sm font-semibold text-gray-700">Peta Zona Kemacetan <span className="text-xs text-gray-400 font-normal">(manual saja)</span></p>
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                   <span className="flex items-center gap-1.5"><span className="w-4 h-1.5 bg-orange-400 rounded inline-block"/>Macet Sedang</span>
                   <span className="flex items-center gap-1.5"><span className="w-4 h-1.5 bg-orange-600 rounded inline-block"/>Macet Parah</span>
@@ -451,15 +560,17 @@ export default function AdminTraffic() {
                   <MapPicker onPick={cgPicker.onMapClick} />
                   {cgPicker.pickA && <Marker position={[cgPicker.pickA.lat, cgPicker.pickA.lng]}><Popup><b>Titik A</b></Popup></Marker>}
                   {cgPicker.pickB && <Marker position={[cgPicker.pickB.lat, cgPicker.pickB.lng]}><Popup><b>Titik B</b></Popup></Marker>}
-                  {cgPicker.edges.map((e,i) => <Polyline key={'cgd'+i} positions={e.polyline.map(p=>[p.lat,p.lng])} pathOptions={{ color:cgForm.level==='HEAVY'?'#ea580c':'#fb923c', weight:6, opacity:.85, dashArray:'8,4' }} />)}
-                  {congestions.flatMap(cg => (cg.edges||[]).map((e,i) => (
-                    <Polyline key={cg.id+'_cg_'+i} positions={e.polyline.map(p=>[p.lat,p.lng])} pathOptions={{ color:cg.level==='HEAVY'?'#ea580c':'#fb923c', weight:5, opacity:.7, dashArray:'8,4' }}>
+                  {cgPicker.edges.map((e, i) => (
+                    <Polyline key={'cgd' + i} positions={e.polyline.map(p => [p.lat, p.lng])} pathOptions={{ color: cgForm.level === 'HEAVY' ? '#ea580c' : '#fb923c', weight: 6, opacity: .85, dashArray: '8,4' }} />
+                  ))}
+                  {congestions.map(cg => (cg.edges || []).map((e, i) => (
+                    <Polyline key={cg.id + '_cg_' + i} positions={e.polyline.map(p => [p.lat, p.lng])} pathOptions={{ color: cg.level === 'HEAVY' ? '#ea580c' : '#fb923c', weight: 5, opacity: .7, dashArray: '8,4' }}>
                       <Popup>
-                        <p style={{fontWeight:'bold',marginBottom:2}}>🚦 {cg.level==='HEAVY'?'Macet Parah':'Macet Sedang'}</p>
-                        <p style={{fontSize:12,color:'#555',marginBottom:8}}>{cg.reason||'—'}</p>
-                        <div style={{display:'flex',gap:6}}>
-                          <button onClick={()=>editCongestion(cg)} style={{flex:1,padding:'4px 8px',background:'#2563eb',color:'white',border:'none',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>Edit</button>
-                          <button onClick={()=>deleteCg(cg)} style={{flex:1,padding:'4px 8px',background:'#dc2626',color:'white',border:'none',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>Hapus</button>
+                        <p style={{ fontWeight: 'bold', marginBottom: 2 }}>🚦 {cg.level === 'HEAVY' ? 'Macet Parah' : 'Macet Sedang'}</p>
+                        <p style={{ fontSize: 12, color: '#555', marginBottom: 8 }}>{cg.reason || '—'}</p>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => editCongestion(cg)} style={{ flex: 1, padding: '4px 8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Edit</button>
+                          <button onClick={() => deleteCg(cg)} style={{ flex: 1, padding: '4px 8px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Hapus</button>
                         </div>
                       </Popup>
                     </Polyline>
@@ -472,18 +583,18 @@ export default function AdminTraffic() {
           {/* Histori */}
           <div className="mt-8 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900">Daftar Zona Kemacetan</h2>
+              <h2 className="text-lg font-bold text-gray-900">Daftar Zona Kemacetan <span className="text-xs text-gray-400 font-normal">(manual)</span></h2>
               <span className="text-xs text-gray-400 font-medium">{congestions.length} data</span>
             </div>
             {loadingCong ? (
               <div className="flex items-center gap-3 text-sm text-gray-400 px-6 py-10 justify-center"><span className="w-4 h-4 border-2 border-gray-200 border-t-orange-500 rounded-full animate-spin"/>Memuat data...</div>
             ) : congestions.length === 0 ? (
-              <div className="px-6 py-12 text-center text-sm text-gray-400">Belum ada zona kemacetan terdaftar.</div>
+              <div className="px-6 py-12 text-center text-sm text-gray-400">Belum ada zona kemacetan manual terdaftar.</div>
             ) : (
               <div className="divide-y divide-gray-50">
                 {congestions.map(cg => (
                   <HistoryRow key={cg.id} item={cg} editingId={cgForm.id} onEdit={editCongestion} onDelete={deleteCg}
-                    badgeClass={cg.level==='HEAVY'?'bg-orange-200 text-orange-800':'bg-orange-100 text-orange-600'}
+                    badgeClass={cg.level === 'HEAVY' ? 'bg-orange-200 text-orange-800' : 'bg-orange-100 text-orange-600'}
                     badgeLabel={`🚦 ${cg.level}`}
                     extraInfo={cg.end_time ? <> s/d {dayjs(cg.end_time).format('DD/MM HH:mm')}</> : null} />
                 ))}

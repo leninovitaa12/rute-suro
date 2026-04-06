@@ -11,6 +11,12 @@ import {
   updateParkingSpot,
   deleteParkingSpot,
 } from '../../lib/backendApi'
+import Swal from 'sweetalert2'
+
+// ─── SweetAlert2 helpers ────────────────────────────────────────────────────────
+const swalOK  = (title, text) => Swal.fire({ icon: 'success', title, text, timer: 3000, timerProgressBar: true, confirmButtonColor: '#16a34a', confirmButtonText: 'OK' })
+const swalErr = (title, text) => Swal.fire({ icon: 'error', title, text: text || 'Terjadi kesalahan.', confirmButtonColor: '#dc2626', confirmButtonText: 'Tutup' })
+const swalDel = (name) => Swal.fire({ icon: 'warning', title: 'Hapus data ini?', html: `<span style="color:#374151;font-size:14px"><b>${name}</b> akan dihapus permanen.</span>`, showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', reverseButtons: true })
 
 // ─── Leaflet icons ─────────────────────────────────────────────────────────────
 const DEFAULT_CENTER = [-7.871, 111.462]
@@ -44,94 +50,6 @@ function toIsoOrNull(v) {
 function MapPicker({ onPick }) {
   useMapEvents({ click(e) { onPick({ lat: e.latlng.lat, lng: e.latlng.lng }) } })
   return null
-}
-
-// ─── Toast system ─────────────────────────────────────────────────────────────
-// Toast dirender di BODY-level agar tidak tertindih elemen lain
-function useToast() {
-  const [toasts, setToasts] = useState([])
-  const push = useCallback((message, type = 'success', duration = 4500) => {
-    const id = Date.now() + Math.random()
-    setToasts(prev => [...prev, { id, message, type }])
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), duration)
-  }, [])
-  return { toasts, push }
-}
-
-function ToastContainer({ toasts }) {
-  if (!toasts.length) return null
-  return (
-    <div
-      className="fixed z-[99999] flex flex-col gap-2.5 pointer-events-none"
-      style={{ top: 24, right: 24, minWidth: 320, maxWidth: 420 }}
-    >
-      {toasts.map(t => (
-        <div key={t.id}
-          className="flex items-start gap-3 px-4 py-3.5 rounded-xl border text-sm font-semibold pointer-events-auto"
-          style={{
-            background: 'white',
-            boxShadow: '0 6px 32px rgba(0,0,0,0.18)',
-            borderColor: t.type === 'success' ? '#4ade80' : t.type === 'error' ? '#f87171' : t.type === 'warning' ? '#fbbf24' : '#60a5fa',
-            color:       t.type === 'success' ? '#166534' : t.type === 'error' ? '#991b1b' : t.type === 'warning' ? '#92400e' : '#1e40af',
-          }}
-        >
-          {/* icon */}
-          <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center mt-0.5"
-            style={{ background: t.type === 'success' ? '#dcfce7' : t.type === 'error' ? '#fee2e2' : t.type === 'warning' ? '#fef3c7' : '#dbeafe' }}>
-            {t.type === 'success' && (
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-              </svg>
-            )}
-            {t.type === 'error' && (
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            )}
-            {(t.type === 'info' || t.type === 'warning') && (
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-            )}
-          </span>
-          <span className="leading-snug flex-1">{t.message}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─── Custom Confirm Dialog ─────────────────────────────────────────────────────
-function ConfirmDialog({ open, title, message, onConfirm, onCancel }) {
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.45)' }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
-        <div className="flex items-start gap-4 mb-5">
-          <span className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </span>
-          <div className="flex-1">
-            <h3 className="text-base font-bold text-gray-900 mb-1">{title}</h3>
-            <p className="text-sm text-gray-500 leading-relaxed">{message}</p>
-          </div>
-        </div>
-        <div className="flex gap-3 justify-end">
-          <button onClick={onCancel}
-            className="px-5 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
-            Batal
-          </button>
-          <button onClick={onConfirm}
-            className="px-5 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition">
-            Ya, Hapus
-          </button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 // ─── Field helper ──────────────────────────────────────────────────────────────
@@ -217,16 +135,12 @@ function EventModal({ editingId, formData, markerPos, onChange, onMapPick, onSub
 }
 
 // ─── Modal: Kelola Parkir ─────────────────────────────────────────────────────
-function ParkingModal({ event, spots, onClose, onRefresh, toast }) {
+function ParkingModal({ event, spots, onClose, onRefresh }) {
   const EMPTY = { name: '', description: '', capacity: '', lat: event.lat, lng: event.lng }
   const [form, setForm]     = useState(EMPTY)
   const [marker, setMarker] = useState({ lat: event.lat, lng: event.lng })
   const [editId, setEditId] = useState(null)
   const [saving, setSaving] = useState(false)
-
-  // Confirm delete state
-  const [confirmOpen, setConfirmOpen]     = useState(false)
-  const [confirmTarget, setConfirmTarget] = useState(null)
 
   const eventSpots = spots.filter(s => String(s.event_id) === String(event.id))
 
@@ -253,7 +167,7 @@ function ParkingModal({ event, spots, onClose, onRefresh, toast }) {
   }
 
   async function handleSave() {
-    if (!form.name.trim()) { toast('Nama titik parkir wajib diisi.', 'error'); return }
+    if (!form.name.trim()) { swalErr('Validasi Gagal', 'Nama titik parkir wajib diisi.'); return }
     setSaving(true)
     try {
       const payload = {
@@ -266,50 +180,35 @@ function ParkingModal({ event, spots, onClose, onRefresh, toast }) {
       }
       if (editId) {
         await updateParkingSpot(editId, payload)
-        toast(`Titik parkir "${form.name}" berhasil diperbarui.`, 'success')
+        await swalOK('Berhasil Diperbarui!', `Titik parkir "${form.name}" berhasil diperbarui.`)
       } else {
         await createParkingSpot(payload)
-        toast(`Titik parkir "${form.name}" berhasil ditambahkan.`, 'success')
+        await swalOK('Berhasil Ditambahkan!', `Titik parkir "${form.name}" berhasil ditambahkan.`)
       }
       resetForm()
       await onRefresh()
     } catch (err) {
-      toast('Gagal menyimpan: ' + (err?.message || 'Terjadi kesalahan'), 'error')
+      swalErr('Gagal Menyimpan', err?.response?.data?.detail || err?.message || 'Terjadi kesalahan.')
     } finally {
       setSaving(false)
     }
   }
 
-  function requestDelete(id, name) {
-    setConfirmTarget({ id, name })
-    setConfirmOpen(true)
-  }
-
-  async function confirmDelete() {
-    if (!confirmTarget) return
-    setConfirmOpen(false)
+  async function requestDelete(id, name) {
+    const result = await swalDel(name)
+    if (!result.isConfirmed) return
     try {
-      await deleteParkingSpot(confirmTarget.id)
-      toast(`Titik parkir "${confirmTarget.name}" berhasil dihapus.`, 'success')
-      if (editId === confirmTarget.id) resetForm()
+      await deleteParkingSpot(id)
+      await swalOK('Berhasil Dihapus!', `Titik parkir "${name}" berhasil dihapus.`)
+      if (editId === id) resetForm()
       await onRefresh()
     } catch (err) {
-      toast('Gagal menghapus: ' + (err?.message || 'Terjadi kesalahan'), 'error')
-    } finally {
-      setConfirmTarget(null)
+      swalErr('Gagal Menghapus', err?.response?.data?.detail || err?.message || 'Terjadi kesalahan.')
     }
   }
 
   return (
     <div className="fixed inset-0 bg-black/40 z-[500] flex items-center justify-center p-4">
-      <ConfirmDialog
-        open={confirmOpen}
-        title="Hapus Titik Parkir?"
-        message={confirmTarget ? `Titik parkir "${confirmTarget.name}" akan dihapus permanen.` : ''}
-        onConfirm={confirmDelete}
-        onCancel={() => { setConfirmOpen(false); setConfirmTarget(null) }}
-      />
-
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
@@ -429,16 +328,11 @@ function ParkingModal({ event, spots, onClose, onRefresh, toast }) {
 
 // ─── Komponen utama AdminEvent ────────────────────────────────────────────────
 export default function AdminEvent() {
-  const { toasts, push: toast } = useToast()
 
   const [events, setEvents]           = useState([])
   const [parkingSpots, setParkingSpots] = useState([])
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState(null)
-
-  // Confirm dialog state
-  const [confirmOpen, setConfirmOpen]     = useState(false)
-  const [confirmTarget, setConfirmTarget] = useState(null) // { id, name }
 
   // Event form state
   const EMPTY_EVENT = { name: '', description: '', location: '', start_time: '', end_time: '', lat: DEFAULT_CENTER[0], lng: DEFAULT_CENTER[1] }
@@ -509,8 +403,8 @@ export default function AdminEvent() {
   }
 
   async function handleSubmit() {
-    if (!formData.name.trim())  { toast('Nama event wajib diisi.', 'error'); return }
-    if (!formData.start_time)   { toast('Waktu mulai wajib diisi.', 'error'); return }
+    if (!formData.name.trim())  { swalErr('Validasi Gagal', 'Nama event wajib diisi.'); return }
+    if (!formData.start_time)   { swalErr('Validasi Gagal', 'Waktu mulai wajib diisi.'); return }
     setSavingEvent(true)
     try {
       const payload = {
@@ -525,55 +419,36 @@ export default function AdminEvent() {
       if (editingId) {
         const updated = await updateEvent(editingId, payload)
         setEvents(prev => prev.map(ev => ev.id === editingId ? updated : ev))
-        toast(`Event "${payload.name}" berhasil diperbarui.`, 'success')
+        await swalOK('Berhasil Diperbarui!', `Event "${payload.name}" berhasil diperbarui.`)
       } else {
         const created = await createEvent(payload)
         setEvents(prev => [...prev, created])
-        toast(`Event "${payload.name}" berhasil ditambahkan.`, 'success')
+        await swalOK('Berhasil Ditambahkan!', `Event "${payload.name}" berhasil ditambahkan.`)
       }
       setShowEventModal(false)
     } catch (err) {
-      toast('Gagal menyimpan event: ' + (err?.message || 'Terjadi kesalahan'), 'error')
+      swalErr('Gagal Menyimpan Event', err?.response?.data?.detail || err?.message || 'Terjadi kesalahan.')
     } finally {
       setSavingEvent(false)
     }
   }
 
-  function requestDeleteEvent(id, name) {
-    setConfirmTarget({ id, name })
-    setConfirmOpen(true)
-  }
-
-  async function confirmDeleteEvent() {
-    if (!confirmTarget) return
-    setConfirmOpen(false)
+  async function requestDeleteEvent(id, name) {
+    const result = await swalDel(name)
+    if (!result.isConfirmed) return
     try {
-      await deleteEvent(confirmTarget.id)
-      setEvents(prev => prev.filter(ev => ev.id !== confirmTarget.id))
-      setParkingSpots(prev => prev.filter(s => String(s.event_id) !== String(confirmTarget.id)))
-      toast(`Event "${confirmTarget.name}" berhasil dihapus.`, 'success')
+      await deleteEvent(id)
+      setEvents(prev => prev.filter(ev => ev.id !== id))
+      setParkingSpots(prev => prev.filter(s => String(s.event_id) !== String(id)))
+      await swalOK('Berhasil Dihapus!', `Event "${name}" berhasil dihapus.`)
     } catch (err) {
-      toast('Gagal menghapus event: ' + (err?.message || 'Terjadi kesalahan'), 'error')
-    } finally {
-      setConfirmTarget(null)
+      swalErr('Gagal Menghapus Event', err?.response?.data?.detail || err?.message || 'Terjadi kesalahan.')
     }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div>
-      {/* Toast — z-index sangat tinggi, selalu tampil di atas segalanya */}
-      <ToastContainer toasts={toasts} />
-
-      {/* Confirm dialog hapus event */}
-      <ConfirmDialog
-        open={confirmOpen}
-        title="Hapus Event?"
-        message={confirmTarget ? `Event "${confirmTarget.name}" beserta semua titik parkirnya akan dihapus permanen.` : ''}
-        onConfirm={confirmDeleteEvent}
-        onCancel={() => { setConfirmOpen(false); setConfirmTarget(null) }}
-      />
-
       {/* Header */}
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
@@ -609,7 +484,6 @@ export default function AdminEvent() {
           spots={parkingSpots}
           onClose={() => { setShowParkingModal(false); setSelectedEventForParking(null) }}
           onRefresh={refreshParking}
-          toast={toast}
         />
       )}
 
