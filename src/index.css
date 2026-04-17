@@ -214,3 +214,85 @@ html {
   transform: translateY(0) scale(1) !important;
   transition: opacity 140ms ease, transform 140ms ease !important;
 }
+
+/* ===== TOOLTIP STYLING ===== */
+/* Tooltip dengan data-tooltip attribute untuk desktop */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #2B3440;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+}
+
+[data-tooltip]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #2B3440;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+/* Tooltip position variants */
+[data-tooltip-position="right"]:hover::after {
+  bottom: auto;
+  top: 50%;
+  left: calc(100% + 8px);
+  transform: translateY(-50%);
+}
+
+[data-tooltip-position="right"]:hover::before {
+  bottom: auto;
+  top: 50%;
+  left: auto;
+  right: calc(100% + 2px);
+  border: 6px solid transparent;
+  border-right-color: #2B3440;
+}
+
+[data-tooltip-position="bottom"]:hover::after {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
+[data-tooltip-position="bottom"]:hover::before {
+  bottom: auto;
+  top: calc(100% + 2px);
+  border: 6px solid transparent;
+  border-bottom-color: #2B3440;
+}
+
+[data-tooltip-position="left"]:hover::after {
+  bottom: auto;
+  top: 50%;
+  left: auto;
+  right: calc(100% + 8px);
+  transform: translateY(-50%);
+}
+
+[data-tooltip-position="left"]:hover::before {
+  bottom: auto;
+  top: 50%;
+  left: auto;
+  right: calc(100% + 2px);
+  border: 6px solid transparent;
+  border-left-color: #2B3440;
+}
