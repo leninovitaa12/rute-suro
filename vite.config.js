@@ -4,4 +4,9 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    allowedHosts: [
+      'ribcage-pod-untidy.ngrok-free.dev' // Tambahkan domain ngrok Anda di sini
+    ]
+  }
 })
