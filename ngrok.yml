@@ -1,0 +1,14 @@
+version: 2
+authtoken: 3CFPvZEY8AueWAugkpOBCxO7bb0_3hx62vBt212pb8hunC7Pd
+
+tunnels:
+  backend:
+    proto: http
+    addr: 8000
+    # Opsional: Tambahkan header jika diperlukan
+    # host_header: localhost:8000
+
+  frontend:
+    proto: http
+    addr: 5173
+    # Opsional untuk HMR Vite (lihat Langkah 7)

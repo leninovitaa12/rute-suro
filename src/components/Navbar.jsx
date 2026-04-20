@@ -68,6 +68,9 @@ export default function Navbar() {
           color: white;
           text-decoration: none;
           padding-bottom: 4px;
+          outline: none !important;
+          box-shadow: none !important;
+          border: none !important;
           transition: color 0.25s ease, transform 0.2s ease;
         }
         .nav-link::after {
@@ -163,6 +166,7 @@ export default function Navbar() {
                 key={to}
                 to={to}
                 className={`nav-link${isActive(to) ? ' active' : ''}`}
+                style={{ outline: 'none', boxShadow: 'none' }}
               >
                 {label}
               </Link>

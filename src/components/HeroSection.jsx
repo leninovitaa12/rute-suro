@@ -142,11 +142,6 @@ export default function HeroSection() {
           from { opacity: 0; transform: scale(1.07); }
           to   { opacity: 1; transform: scale(1); }
         }
-        @keyframes progressGrow {
-          from { width: 0%; }
-          to   { width: 100%; }
-        }
-
         .hero-title    { animation: fadeInUp 0.6s ease-out 0.10s backwards; }
         .hero-subtitle { animation: fadeInUp 0.6s ease-out 0.22s backwards; }
         .hero-buttons  { animation: fadeInUp 0.6s ease-out 0.34s backwards; }
@@ -229,15 +224,6 @@ export default function HeroSection() {
         }
         .c-dot-pill.on { background: #fca5a5; width: 56px; }
 
-        /* progress bar */
-        .c-progress {
-          position: absolute; bottom: 0; left: 0;
-          height: 3px; z-index: 10;
-          background: linear-gradient(to right, #fca5a5, #ef4444);
-          border-radius: 0 2px 0 0;
-        }
-        .c-progress.run { animation: progressGrow 5s linear forwards; }
-
         /* slide counter (desktop only) */
         .c-num {
           position: absolute; bottom: 22px; right: 28px; z-index: 10;
@@ -306,9 +292,6 @@ export default function HeroSection() {
       {/* ══ ARROWS (desktop only — hidden on mobile via CSS) ══ */}
       <button className="c-arrow c-arrow-left"  onClick={prev} aria-label="Previous">‹</button>
       <button className="c-arrow c-arrow-right" onClick={next} aria-label="Next">›</button>
-
-      {/* ══ PROGRESS BAR ══ */}
-      <div key={`prog-${current}`} className="c-progress run" style={{ width: 0 }} />
 
       {/* ══ SLIDE COUNTER (desktop only) ══ */}
       <div className="c-num">
