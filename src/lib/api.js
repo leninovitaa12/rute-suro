@@ -1,8 +1,21 @@
-const RAW_API_BASE =
-  import.meta.env.VITE_API_BASE ||
-  import.meta.env.VITE_API_BASE_URL ||
-  // "http://10.70.3.141:8000";
-  "http://127.0.0.1:5000";
+function detectApiBase() {
+  if (import.meta.env.VITE_API_BASE) return import.meta.env.VITE_API_BASE;
+  if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL;
+
+  const { protocol, hostname } = window.location;
+
+  // Jika hostname mengandung port dalam bentuk subdomain (dev tunnel format: name-PORT.region.devtunnels.ms)
+  const tunnelMatch = hostname.match(/^(.+-)(\d+)(\.asse\.devtunnels\.ms|\.eus\.devtunnels\.ms|\.weu\.devtunnels\.ms|\.devtunnels\.ms)$/);
+  if (tunnelMatch) {
+    // tunnelMatch[1] = "9gdqprf3-", tunnelMatch[2] = "5173", tunnelMatch[3] = ".asse.devtunnels.ms"
+    return `${protocol}//${tunnelMatch[1]}8000${tunnelMatch[3]}`;
+  }
+
+  // Localhost / IP biasa — hanya ganti port
+  return `${protocol}//${hostname}:8000`;
+}
+
+const RAW_API_BASE = detectApiBase();
 
 const API_BASE_URL = RAW_API_BASE.replace(/\/+$/, "");
 
@@ -55,9 +68,6 @@ async function request(method, path, body, options = {}) {
   return { data: payload };
 }
 
-/**
- * Export `api` sesuai yang dipakai UserMapPage.jsx
- */
 export const api = {
   get: (path, options) => request("GET", path, undefined, options),
   post: (path, body, options) => request("POST", path, body, options),
