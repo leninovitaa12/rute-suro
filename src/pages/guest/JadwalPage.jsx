@@ -3,25 +3,27 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api.js'
 import dayjs from 'dayjs'
 
-// ── Reverse Geocode Helper (Nominatim OpenStreetMap, gratis) ──
+// ── Reverse Geocode — pakai BigDataCloud (support CORS, gratis, tanpa API key) ──
 async function reverseGeocode(lat, lng) {
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=id`,
-      { headers: { 'Accept-Language': 'id' } }
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=id`
     )
-    const data = await res.json()
-    if (data && data.address) {
-      const a = data.address
-      return (
-        a.road || a.neighbourhood || a.suburb || a.village ||
-        a.town || a.city_district || a.city || a.county ||
-        data.display_name?.split(',')[0] ||
-        `${lat.toFixed(5)}, ${lng.toFixed(5)}`
-      )
-    }
-  } catch (_) {}
-  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const d = await res.json()
+
+    // Prioritas: locality (kelurahan/kecamatan) → kota → provinsi
+    return (
+      d.locality ||
+      d.city ||
+      d.principalSubdivision ||
+      d.countryName ||
+      `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    )
+  } catch (err) {
+    console.warn('[reverseGeocode] failed:', err.message)
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+  }
 }
 
 export default function JadwalPage() {
@@ -37,7 +39,15 @@ export default function JadwalPage() {
         const res  = await api.get('/events')
         const data = res.data || []
         setEvents(data)
-        const uniqueKeys = [...new Set(data.map(e => `${e.lat},${e.lng}`))]
+
+        // Deduplikasi koordinat valid
+        const uniqueKeys = [...new Set(
+          data
+            .filter(e => e.lat != null && e.lng != null)
+            .map(e => `${e.lat},${e.lng}`)
+        )]
+
+        // BigDataCloud support CORS — bisa parallel semua
         const results = await Promise.all(
           uniqueKeys.map(async key => {
             const [lat, lng] = key.split(',').map(Number)
@@ -70,11 +80,6 @@ export default function JadwalPage() {
     return getStatus(event) === filter
   })
 
-  // ── FIX 1: Navigasi ke /map dengan eventId + koordinat ───────────────────
-  // UserMapPage akan membaca ?eventId=xxx&lat=xxx&lng=xxx dan langsung:
-  //   1. Set selectedEventId
-  //   2. Set end ke koordinat event
-  //   3. Fly kamera ke lokasi event
   function handleLihatDiMap(event) {
     const params = new URLSearchParams({
       eventId: event.id,
@@ -208,7 +213,8 @@ export default function JadwalPage() {
                 const isPast     = status === 'past'
                 const isOngoing  = status === 'ongoing'
                 const locKey     = `${event.lat},${event.lng}`
-                const locName    = locationNames[locKey]
+                const hasCoords  = event.lat != null && event.lng != null
+                const locName    = hasCoords ? locationNames[locKey] : null
 
                 return (
                   <div key={event.id} className="j-card">
@@ -239,7 +245,9 @@ export default function JadwalPage() {
                         )}
                         <div style={{ fontSize:'13px' }}>
                           <p style={{ color:'#9ca3af', fontWeight:600, marginBottom:'5px' }}>Lokasi</p>
-                          {locName ? (
+                          {!hasCoords ? (
+                            <span style={{ color:'#9ca3af', fontSize:'13px' }}>—</span>
+                          ) : locName ? (
                             <span className="loc-pill">
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink:0 }}>
                                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
@@ -252,11 +260,7 @@ export default function JadwalPage() {
                         </div>
                       </div>
 
-                      {/* FIX 1: Gunakan button + navigate, bukan Link, agar bisa kirim state */}
-                      <button
-                        className="btn-map"
-                        onClick={() => handleLihatDiMap(event)}
-                      >
+                      <button className="btn-map" onClick={() => handleLihatDiMap(event)}>
                         Lihat di Map
                         <svg className="btn-map-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M5 12h14M12 5l7 7-7 7"/>

@@ -9,7 +9,7 @@ const destinations = [
   },
   {
     img: '/images/grebeg-suro-2.jpg',
-    title: 'Makam Betoro Katong',
+    title: 'Makam Batoro Katong',
     large: false,
   },
   {
@@ -29,7 +29,7 @@ export default function DestinationSection() {
               <div className="w-5 h-1.5 bg-green-700 rounded-full" />
               <span className="text-xs font-bold tracking-widest uppercase text-[#922626]">Spiritual Landmarks</span>
             </div>
-            <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">Destinasi Sakral</h2>
+            <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">Destinasi Sejarah</h2>
           </div>
           <p className="text-gray-400 max-w-xs text-sm italic">
             Menjelajahi titik-titik energi dan sejarah yang membentuk identitas kultural Ponorogo.

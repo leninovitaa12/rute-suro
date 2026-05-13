@@ -14,10 +14,18 @@ import {
 } from '../../lib/backendApi'
 import Swal from 'sweetalert2'
 
+// ─── SweetAlert2 z-index fix (harus tampil di atas modal z-99999) ──────────────
+const SWAL_Z = {
+  didOpen: () => {
+    const el = document.querySelector('.swal2-container')
+    if (el) el.style.zIndex = '999999'
+  },
+}
+
 // ─── SweetAlert2 helpers ────────────────────────────────────────────────────────
-const swalOK  = (title, text) => Swal.fire({ icon: 'success', title, text, timer: 3000, timerProgressBar: true, confirmButtonColor: '#16a34a', confirmButtonText: 'OK' })
-const swalErr = (title, text) => Swal.fire({ icon: 'error', title, text: text || 'Terjadi kesalahan.', confirmButtonColor: '#dc2626', confirmButtonText: 'Tutup' })
-const swalDel = (name) => Swal.fire({ icon: 'warning', title: 'Hapus data ini?', html: `<span style="color:#374151;font-size:14px"><b>${name}</b> akan dihapus permanen.</span>`, showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', reverseButtons: true })
+const swalOK  = (title, text) => Swal.fire({ ...SWAL_Z, icon: 'success', title, text, timer: 3000, timerProgressBar: true, confirmButtonColor: '#16a34a', confirmButtonText: 'OK' })
+const swalErr = (title, text) => Swal.fire({ ...SWAL_Z, icon: 'error',   title, text: text || 'Terjadi kesalahan.', confirmButtonColor: '#dc2626', confirmButtonText: 'Tutup' })
+const swalDel = (name)        => Swal.fire({ ...SWAL_Z, icon: 'warning', title: 'Hapus data ini?', html: `<span style="color:#374151;font-size:14px"><b>${name}</b> akan dihapus permanen.</span>`, showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', reverseButtons: true })
 
 // ─── Leaflet icons ─────────────────────────────────────────────────────────────
 const DEFAULT_CENTER = [-7.871, 111.462]
@@ -522,13 +530,14 @@ export default function AdminEvent() {
       if (editingId) {
         const updated = await updateEvent(editingId, payload)
         setEvents(prev => prev.map(ev => ev.id === editingId ? updated : ev))
+        setShowEventModal(false)
         await swalOK('Berhasil Diperbarui!', `Event "${payload.name}" berhasil diperbarui.`)
       } else {
         const created = await createEvent(payload)
         setEvents(prev => [...prev, created])
+        setShowEventModal(false)
         await swalOK('Berhasil Ditambahkan!', `Event "${payload.name}" berhasil ditambahkan.`)
       }
-      setShowEventModal(false)
     } catch (err) {
       swalErr('Gagal Menyimpan Event', err?.response?.data?.detail || err?.message || 'Terjadi kesalahan.')
     } finally {
