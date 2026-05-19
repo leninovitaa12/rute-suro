@@ -2,7 +2,7 @@ import React from 'react'
 
 /**
  * Tooltip component yang tidak break layout
- * Gunakan sebagai wrapper halus di sekitar button/element
+ * Digunakan sebagai wrapper halus di sekitar button/element
  */
 export default function Tooltip({ children, title }) {
   const [isMobile, setIsMobile] = React.useState(false)

@@ -5,10 +5,10 @@ const FLIP_WORDS = ['Budaya', 'Wisata', 'Tradisi', 'Warisan']
 
 // ─── CAROUSEL SLIDES 
 const SLIDES = [
-  { src: '/images/grebeg-suro-1.jpg' },
-  { src: '/images/grebeg-suro-2.jpg' },
-  { src: '/images/grebeg-suro-3.jpg' },
-  { src: '/images/grebeg-suro-4.jpg' },
+  { src: '/images/grebeg-suro-1.webp' },
+  { src: '/images/grebeg-suro-2.webp' },
+  { src: '/images/grebeg-suro-3.webp' },
+  { src: '/images/grebeg-suro-4.webp' },
 ]
 
 const PARTICLES = [

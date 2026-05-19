@@ -113,7 +113,7 @@ export default function SejarahPage() {
   return (
     <div className="min-h-screen bg-white">
       <style>{`
-        /* PLUS JAKARTA SANS — GLOBAL (SEMUA TEXT) */
+        /* PLUS JAKARTA SANS — GLOBAL  */
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
         :root{
@@ -121,13 +121,13 @@ export default function SejarahPage() {
         }
         * { font-family: var(--app-font) !important; }
 
-        /* FIX 1: Hero full screen, no white gap below, text tidak terpotong */
+        /* FIX 1: Hero full screen*/
         .s-hero {
           height: 100vh;
           min-height: 600px;
           background:
             linear-gradient(160deg, rgba(60,3,3,0.92) 0%, rgba(110,8,8,0.78) 45%, rgba(15,1,1,0.62) 100%),
-            url('/images/sejarah-1.jpg') center/cover no-repeat;
+            url('/images/sejarah-1.webp') center/cover no-repeat;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -395,7 +395,7 @@ export default function SejarahPage() {
                 Grebeg Suro merupakan tradisi tahunan masyarakat Ponorogo yang bertepatan dengan malam 1 Suro (1 Muharram). Perayaan ini tidak hanya menjadi pesta rakyat, namun juga merupakan paduan antara nilai religius, seni budaya Reog yang mendunia, dan penghormatan terhadap leluhur.
               </p>
               <div className="grid grid-cols-2 gap-4">
-                {['/images/sejarah-2.jpg', '/images/sejarah-3.jpg'].map((src, i) => (
+                {['/images/sejarah-2.webp', '/images/sejarah-3.webp'].map((src, i) => (
                   <div key={i} className="rounded-xl overflow-hidden h-48 shadow-md transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl">
                     <img src={src} alt="Budaya Ponorogo" className="w-full h-full object-cover block" />
                   </div>
@@ -450,7 +450,7 @@ export default function SejarahPage() {
             {/* Image — lebih besar dan fit */}
             <div className="s-legenda-img">
               <img
-                src="/images/sejarah-1.jpg"
+                src="/images/sejarah-1.webp"
                 alt="Wayang Ponorogo"
               />
             </div>
