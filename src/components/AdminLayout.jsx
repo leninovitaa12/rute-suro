@@ -56,18 +56,11 @@ export default function AdminLayout({ children }) {
       cancelButtonText: 'Batal',
       reverseButtons: true,
     })
-
     if (!result.isConfirmed) return
-
     await Swal.fire({
-      icon: 'success',
-      title: 'Berhasil Logout',
-      text: 'Sampai jumpa kembali!',
-      timer: 1500,
-      timerProgressBar: true,
-      showConfirmButton: false,
+      icon: 'success', title: 'Berhasil Logout', text: 'Sampai jumpa kembali!',
+      timer: 1500, timerProgressBar: true, showConfirmButton: false,
     })
-
     localStorage.removeItem('adminLoggedIn')
     localStorage.removeItem('adminEmail')
     localStorage.removeItem('adminUserId')
@@ -76,7 +69,6 @@ export default function AdminLayout({ children }) {
 
   const isActive        = (path) => location.pathname === path
   const isContentActive = contentMenuItems.some((item) => isActive(item.path))
-  const adminEmail      = localStorage.getItem('adminEmail') || 'admin@rutesuro.id'
 
   const activePageName =
     mainMenuItems.find((i) => isActive(i.path))?.name ||
@@ -91,7 +83,6 @@ export default function AdminLayout({ children }) {
         .navbar-slide { animation: slideDown 0.4s ease-out; }
         .drop-in      { animation: dropIn 0.18s ease-out; }
 
-        /* ── Kunci: paksa navbar selalu di atas Leaflet (z-index 400-600) ── */
         .leaflet-pane,
         .leaflet-top,
         .leaflet-bottom,
@@ -104,42 +95,113 @@ export default function AdminLayout({ children }) {
         .leaflet-tooltip-pane { z-index: 2 !important; }
         .leaflet-popup-pane   { z-index: 3 !important; }
 
+        /* ── Navbar links: UNDERLINE ONLY, zero background ─────────────────── */
         .nav-link {
-          position: relative; display: inline-flex; align-items: center; gap: 6px;
-          padding: 6px 14px; border-radius: 8px; font-size: 0.875rem; font-weight: 500;
-          color: rgba(255,255,255,0.72); transition: color 0.15s, background 0.15s;
-          white-space: nowrap; text-decoration: none;
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 14px;
+          padding-bottom: 8px;
+          font-size: 0.875rem;
+          font-weight: 500;
+          color: rgba(255,255,255,0.65);
+          text-decoration: none;
+          background: transparent !important;
+          border: none;
+          white-space: nowrap;
+          transition: color 0.15s;
         }
-        .nav-link:hover  { color: #fff; background: rgba(255,255,255,0.12); }
-        .nav-link.active { color: #fff; font-weight: 700; background: rgba(255,255,255,0.18); }
+        .nav-link:hover {
+          color: #ffffff;
+          background: transparent !important;
+        }
+        .nav-link.active {
+          color: #ffffff;
+          font-weight: 700;
+          background: transparent !important;
+        }
+        /* underline hanya di active */
         .nav-link.active::after {
-          content: ''; position: absolute; bottom: -4px; left: 14px; right: 14px;
-          height: 2px; border-radius: 2px 2px 0 0; background: rgba(255,255,255,0.9);
+          content: '';
+          position: absolute;
+          bottom: 0px;
+          left: 14px;
+          right: 14px;
+          height: 2.5px;
+          border-radius: 2px 2px 0 0;
+          background: #ffffff;
         }
-        .nav-btn {
-          display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;
-          border-radius: 8px; font-size: 0.875rem; font-weight: 500;
-          color: rgba(255,255,255,0.72); background: transparent; border: none;
-          cursor: pointer; transition: color 0.15s, background 0.15s; white-space: nowrap;
-        }
-        .nav-btn:hover  { color: #fff; background: rgba(255,255,255,0.12); }
-        .nav-btn.active { color: #fff; font-weight: 700; background: rgba(255,255,255,0.18); }
 
-        .dd-item {
-          display: flex; align-items: center; gap: 10px; padding: 11px 16px;
-          font-size: 0.875rem; font-weight: 500; color: #374151;
-          text-decoration: none; transition: background 0.12s, color 0.12s; cursor: pointer;
+        /* ── Navbar dropdown trigger button ─────────────────────────────────── */
+        .nav-btn {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 14px;
+          padding-bottom: 8px;
+          font-size: 0.875rem;
+          font-weight: 500;
+          color: rgba(255,255,255,0.65);
+          background: transparent !important;
+          border: none;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: color 0.15s;
         }
-        .dd-item:hover { background: #fef2f2; color: #b91c1c; }
-        .dd-item.active { background: #fef2f2; color: #b91c1c; font-weight: 700; border-left: 3px solid #b91c1c; padding-left: 13px; }
+        .nav-btn:hover {
+          color: #ffffff;
+          background: transparent !important;
+        }
+        .nav-btn.active {
+          color: #ffffff;
+          font-weight: 700;
+          background: transparent !important;
+        }
+        .nav-btn.active::after {
+          content: '';
+          position: absolute;
+          bottom: 0px;
+          /* exclude the chevron icon from underline width */
+          left: 14px;
+          right: 34px;
+          height: 2.5px;
+          border-radius: 2px 2px 0 0;
+          background: #ffffff;
+        }
+
+        /* ── Dropdown items ──────────────────────────────────────────────────── */
+        .dd-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 11px 16px;
+          font-size: 0.875rem;
+          font-weight: 500;
+          color: #374151;
+          text-decoration: none;
+          transition: background 0.12s, color 0.12s;
+          cursor: pointer;
+        }
+        .dd-item:hover {
+          background: #fef2f2;
+          color: #b91c1c;
+        }
+        .dd-item.active {
+          background: #fef2f2;
+          color: #b91c1c;
+          font-weight: 700;
+          border-left: 3px solid #b91c1c;
+          padding-left: 13px;
+        }
       `}</style>
 
-      {/* ── Navbar — z-[9999] agar selalu di atas Leaflet ── */}
       <header className="navbar-slide sticky top-0 bg-red-800 shadow-lg" style={{ zIndex: 9999 }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 gap-4">
 
-            {/* Brand */}
+            {/* Logo */}
             <Link to="/admin/dashboard" className="flex items-center gap-2.5 flex-shrink-0">
               <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
                 <svg className="w-5 h-5 text-red-700" fill="currentColor" viewBox="0 0 24 24">
@@ -151,7 +213,10 @@ export default function AdminLayout({ children }) {
 
             {/* Nav */}
             <nav className="hidden md:flex items-center gap-1 flex-1 justify-center">
-              <Link to="/admin/dashboard" className={`nav-link ${isActive('/admin/dashboard') ? 'active' : ''}`}>
+              <Link
+                to="/admin/dashboard"
+                className={`nav-link ${isActive('/admin/dashboard') ? 'active' : ''}`}
+              >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
@@ -159,28 +224,48 @@ export default function AdminLayout({ children }) {
               </Link>
 
               {mainMenuItems.map((item) => (
-                <Link key={item.path} to={item.path} className={`nav-link ${isActive(item.path) ? 'active' : ''}`}>
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`nav-link ${isActive(item.path) ? 'active' : ''}`}
+                >
                   {item.icon}{item.name}
                 </Link>
               ))}
 
-              {/* Dropdown Konten */}
+              {/* Content dropdown */}
               <div className="relative" ref={dropdownRef}>
-                <button type="button" className={`nav-btn ${isContentActive ? 'active' : ''}`}
-                  onClick={() => setContentMenuOpen(prev => !prev)}>
+                <button
+                  type="button"
+                  className={`nav-btn ${isContentActive ? 'active' : ''}`}
+                  onClick={() => setContentMenuOpen(prev => !prev)}
+                >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   Manajemen Konten
-                  <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${contentMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg
+                    className={`w-3.5 h-3.5 transition-transform duration-200 ${contentMenuOpen ? 'rotate-180' : ''}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
+
                 {contentMenuOpen && (
-                  <div className="drop-in absolute top-[calc(100%+10px)] left-0 w-52 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden" style={{ zIndex: 10000 }}>
+                  <div
+                    className="drop-in absolute top-[calc(100%+4px)] left-0 w-52 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden"
+                    style={{ zIndex: 10000 }}
+                  >
                     {contentMenuItems.map((item) => (
-                      <Link key={item.path} to={item.path} className={`dd-item ${isActive(item.path) ? 'active' : ''}`}>
-                        <span className={isActive(item.path) ? 'text-red-600' : 'text-gray-400'}>{item.icon}</span>
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        className={`dd-item ${isActive(item.path) ? 'active' : ''}`}
+                      >
+                        <span className={isActive(item.path) ? 'text-red-600' : 'text-gray-400'}>
+                          {item.icon}
+                        </span>
                         {item.name}
                       </Link>
                     ))}
@@ -191,8 +276,10 @@ export default function AdminLayout({ children }) {
 
             {/* Logout */}
             <div className="flex items-center gap-3 flex-shrink-0">
-              <button onClick={handleLogout}
-                className="flex items-center gap-1.5 px-4 py-2 bg-white text-red-700 text-sm font-bold rounded-lg hover:bg-red-50 active:scale-95 transition-all duration-150 shadow-sm">
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 px-4 py-2 bg-white text-red-700 text-sm font-bold rounded-lg hover:bg-red-50 active:scale-95 transition-all duration-150 shadow-sm"
+              >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
@@ -202,7 +289,7 @@ export default function AdminLayout({ children }) {
           </div>
         </div>
 
-        {/* Breadcrumb */}
+        {/* Breadcrumb bar */}
         <div className="bg-black/15 border-t border-white/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 flex items-center gap-2">
             <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,12 +304,13 @@ export default function AdminLayout({ children }) {
         </div>
       </header>
 
-      {/* ── Main Content — isolation:isolate agar Leaflet z-index tidak bocor ── */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8" style={{ isolation: 'isolate' }}>
+      <main
+        className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8"
+        style={{ isolation: 'isolate' }}
+      >
         {children}
       </main>
 
-      {/* ── Footer ── */}
       <footer className="border-t border-gray-200 bg-white mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
           <p className="text-xs text-gray-400">© {new Date().getFullYear()} Dinas Perhubungan — RUTE SURO Admin Panel</p>
