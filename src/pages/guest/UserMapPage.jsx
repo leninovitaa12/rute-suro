@@ -5,7 +5,6 @@ import dayjs from 'dayjs'
 import { api } from '../../lib/api.js'
 import { usePoiSearch } from '../../hooks/usePoiSearch.js'
 import RightDockPanel from '../../components/RightDockPanel.jsx'
-import Tooltip from '../../components/Tooltip.jsx'
 import MapLayers, { ClickSetter } from '../../components/map/MapLayers.jsx'
 import {
   MapBadge, InstructionOverlay, RouteSummaryBar, LaneSim,
@@ -165,7 +164,7 @@ function TomTomSearchBox({ mode, value, onSelect, disabled, icon: Icon, label, p
   )
 }
 
-// ─── MapRefSetter ────���────────────────────────────────────────────────────────
+// ─── MapRefSetter ─────────────────────────────────────────────────────────────
 function MapRefSetter({ mapRef }) {
   const map = useMap()
   React.useEffect(() => { mapRef.current = map }, [map, mapRef])
@@ -224,11 +223,10 @@ export default function UserMapPage() {
   const [loadingClosures,   setLoadingClosures]  = React.useState(true)
   const [loadingRoute,      setLoadingRoute]     = React.useState(false)
   const [msg,               setMsg]              = React.useState('Pilih START dan TUJUAN, lalu tekan "Cari Rute".')
+  const [closuresBlocked,   setClosuresBlocked]  = React.useState(false)
   const [myPos,             setMyPos]            = React.useState(null)
   const [geoErr,            setGeoErr]           = React.useState('')
   const [tracking,          setTracking]         = React.useState(false)
-  const [geoPermission,     setGeoPermission]    = React.useState('prompt') // 'prompt', 'granted', 'denied'
-  const [checkingGeo,       setCheckingGeo]      = React.useState(true)
   const [followMe,          setFollowMe]         = React.useState(true)
   const [voiceOn,           setVoiceOn]          = React.useState(true)
   const [bearing,           setBearing]          = React.useState(0)
@@ -268,30 +266,6 @@ export default function UserMapPage() {
   )
 
   React.useEffect(() => { if (isMobile) setRightPanelOpen(true) }, [isMobile])
-
-  // Check geolocation permission on mount
-  React.useEffect(() => {
-    if (!navigator.geolocation) {
-      setGeoPermission('denied')
-      setCheckingGeo(false)
-      return
-    }
-
-    if (navigator.permissions && navigator.permissions.query) {
-      navigator.permissions.query({ name: 'geolocation' }).then(result => {
-        setGeoPermission(result.state)
-        setCheckingGeo(false)
-        if (result.state === 'denied') {
-          setGeoErr('Lokasi tidak diaktifkan. Silakan aktifkan lokasi di pengaturan browser atau perangkat Anda.')
-        }
-      }).catch(() => {
-        setCheckingGeo(false)
-      })
-    } else {
-      // Fallback untuk browser lama
-      setCheckingGeo(false)
-    }
-  }, [])
 
   const roundKey = (lat, lng) => `${lat.toFixed(5)},${lng.toFixed(5)}`
 
@@ -431,12 +405,13 @@ export default function UserMapPage() {
       location:    inst.point || null,
     }))
     return {
-      polyline:        data.polyline || data.astar_path || [],
+      polyline:         data.polyline || data.astar_path || [],
       steps,
-      total_time_sec:  data.summary?.duration_s   || 0,
-      total_length_m:  data.summary?.distance_m   || 0,
-      traffic_delay_s: data.summary?.traffic_delay_s || 0,
+      total_time_sec:   data.summary?.duration_s   || 0,
+      total_length_m:   data.summary?.distance_m   || 0,
+      traffic_delay_s:  data.summary?.traffic_delay_s || 0,
       traffic_segments: Array.isArray(data.traffic_segments) ? data.traffic_segments : [],
+      closures_blocked: data.closures_blocked === true,
       mode,
     }
   }
@@ -446,7 +421,7 @@ export default function UserMapPage() {
     if (!s || !e) { if (!silent) setMsg('START dan TUJUAN wajib diisi.'); return }
     setLoadingRoute(true)
     if (!silent) setMsg('Menghitung rute A* (tercepat & terpendek)...')
-    setRoutes({ fastest: null, shortest: null }); setSteps([]); setStepIdx(0)
+    setRoutes({ fastest: null, shortest: null }); setSteps([]); setStepIdx(0); setClosuresBlocked(false)
     try {
       const [resFast, resShort] = await Promise.all([
         api.post('/route', { start: s, end: e, mode: 'fastest' }),
@@ -457,7 +432,17 @@ export default function UserMapPage() {
       setRoutes({ fastest: fast, shortest: short })
       const chosen = (selectedMode === 'shortest' ? short : fast) || fast || short
       if (chosen) { setSteps(Array.isArray(chosen.steps) ? chosen.steps : []); setStepIdx(0) }
-      if (!silent) setMsg(`Rute ditemukan. Estimasi ${chosen?.total_time_sec ? (chosen.total_time_sec / 60).toFixed(1) : '?'} menit. Pilih alternatif rute.`)
+      // Deteksi apakah salah satu rute melewati area closure (fallback mode)
+      const anyBlocked = fast?.closures_blocked || short?.closures_blocked || false
+      setClosuresBlocked(anyBlocked)
+      if (!silent) {
+        if (anyBlocked) {
+          // FIX: Pesan lebih jelas — user tahu ini bukan rute normal, ini fallback
+          setMsg(`Rute ditemukan (~${chosen?.total_time_sec ? (chosen.total_time_sec / 60).toFixed(1) : '?'} menit) — PERHATIAN: tidak ada jalur lain, rute melewati area penutupan jalan. Patuhi petugas!`)
+        } else {
+          setMsg(`Rute ditemukan. Estimasi ${chosen?.total_time_sec ? (chosen.total_time_sec / 60).toFixed(1) : '?'} menit. Pilih alternatif rute.`)
+        }
+      }
       await refreshClosures({ force: true, silent: true })
       if (mapRef.current && s) setTimeout(() => mapRef.current?.flyTo([s.lat, s.lng], 16, { animate: true, duration: 1.2 }), 350)
     } catch (e2) {
@@ -482,61 +467,28 @@ export default function UserMapPage() {
   function useMyLocationAsStart() {
     setGeoErr('')
     if (!navigator.geolocation) return setGeoErr('Browser tidak mendukung Geolocation.')
-    if (geoPermission === 'denied') return setGeoErr('Lokasi tidak diaktifkan. Silakan aktifkan lokasi di pengaturan browser atau perangkat Anda.')
-
-    // Jika sudah ada posisi GPS yang ter-cache, langsung pakai — jangan tunggu lagi
-    if (myPos) {
-      const pt = { lat: myPos.lat, lng: myPos.lng }
-      setStart(pt)
-      setPickMode('end')
-      setSearchActiveMode(null)
-      setMsg('Lokasi kamu dipakai sebagai START. Sekarang pilih TUJUAN.')
-      if (mapRef.current) mapRef.current.flyTo([pt.lat, pt.lng], 16, { animate: true, duration: 0.8 })
-      fillAddressFor('start', pt)
-      return
-    }
-
-    setMsg('Mengambil lokasi GPS...')
     navigator.geolocation.getCurrentPosition(
       pos => {
         const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-        setMyPos(pt)
-        setStart(pt)
-        setPickMode('end')
-        setSearchActiveMode(null)
+        setMyPos(pt); setStart(pt); setPickMode('end')
         setMsg('Lokasi kamu dipakai sebagai START. Sekarang pilih TUJUAN.')
-        if (mapRef.current) mapRef.current.flyTo([pt.lat, pt.lng], 16, { animate: true, duration: 0.8 })
+        if (followMe && mapRef.current) mapRef.current.setView([pt.lat, pt.lng], 16)
         fillAddressFor('start', pt)
       },
-      err => {
-        setGeoErr(
-          err.code === 1
-            ? 'Akses lokasi ditolak. Aktifkan izin lokasi di browser.'
-            : err.code === 3
-            ? 'Timeout GPS. Pastikan GPS aktif dan coba lagi.'
-            : err.message || 'Gagal mengambil lokasi.'
-        )
-        setMsg('Pilih START dan TUJUAN, lalu tekan "Cari Rute".')
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 }
+      err => setGeoErr(err.message || 'Gagal mengambil lokasi'),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
     )
   }
 
   function startTracking() {
     setGeoErr('')
     if (!navigator.geolocation) return setGeoErr('Browser tidak mendukung Geolocation.')
-    if (geoPermission === 'denied') return setGeoErr('Lokasi tidak diaktifkan. Silakan aktifkan lokasi di pengaturan browser atau perangkat Anda.')
     if (watchIdRef.current != null) return
     lastPosRef.current = null
     navigator.geolocation.getCurrentPosition(
       firstPos => {
         const firstPt = { lat: firstPos.coords.latitude, lng: firstPos.coords.longitude }
         setMyPos(firstPt)
-        // Jika start belum di-set, otomatis pakai posisi GPS saat ini
-        if (!start) {
-          setStart(firstPt)
-          fillAddressFor('start', firstPt)
-        }
         if (mapRef.current) {
           mapRef.current.flyTo([firstPt.lat, firstPt.lng], FOLLOW_ZOOM, { animate: true, duration: 1.5 })
         }
@@ -636,18 +588,6 @@ export default function UserMapPage() {
         <RouteSummaryBar activeRoute={activeRoute} selectedMode={selectedMode} tracking={tracking} myPos={myPos} end={end} onRecenter={handleRecenter} />
 
         <RightDockPanel open={rightPanelOpen} onToggle={() => setRightPanelOpen(v => !v)} title="RUTE SURO">
-          {(geoPermission === 'denied' || (geoErr && geoErr.includes('Lokasi tidak'))) && (
-            <div className="mb-4 rounded-2xl border border-[#8b1a1a]/20 bg-[#FEF5F5] p-3">
-              <div className="flex items-start gap-2 mb-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#8b1a1a] text-white flex-shrink-0 mt-0.5"><IconAlertTriangle className="w-3.5 h-3.5" /></span>
-                <div>
-                  <p className="text-sm font-bold text-[#8b1a1a]">Lokasi Tidak Diaktifkan</p>
-                  <p className="text-xs text-[#6B6560] mt-1">Untuk menggunakan navigasi dan mencari lokasi, silakan aktifkan akses lokasi di pengaturan browser atau perangkat Anda.</p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {loadingBootstrap && (
             <div className="mb-4 rounded-2xl border border-[#8b1a1a]/20 bg-[#FEF5F5] p-3">
               <div className="flex items-center gap-2 mb-2">
@@ -661,6 +601,29 @@ export default function UserMapPage() {
             </div>
           )}
 
+          {/* Banner peringatan: rute fallback melewati area closure */}
+          {/* FIX: Banner ini muncul HANYA ketika tidak ada jalur alternatif sama sekali. */}
+          {/* closures_blocked=true dari backend artinya A* gagal bypass closure,      */}
+          {/* lalu fallback tanpa closure dipakai — rute terpaksa melewati jalan tutup. */}
+          {closuresBlocked && (
+            <div className="mb-3 rounded-2xl border-2 border-red-500 bg-[#FEF2F2] px-3 py-3 flex items-start gap-2.5 shadow-sm">
+              <span className="flex-shrink-0 mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold text-red-800 mb-1 uppercase tracking-wide">
+                  ⚠ Peringatan Penutupan Jalan
+                </p>
+                <p className="text-[11px] text-red-700 leading-relaxed font-semibold">
+                  Tidak ada jalur alternatif. Rute ini melewati area yang sedang ditutup —
+                  patuhi arahan petugas di lapangan.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="mb-3 rounded-2xl border border-[#DDD8D0] bg-[#F4F2EF] px-3 py-2.5">
             <p className="text-[11px] font-extrabold tracking-[0.08em] text-[#6B6560] uppercase mb-1">Status</p>
             <p className="text-xs font-semibold text-[#2B3440] leading-relaxed">{msg}</p>
@@ -668,84 +631,56 @@ export default function UserMapPage() {
 
           <div className="mb-1">
             <div className="relative flex flex-col gap-1.5">
-              <Tooltip content="Cari lokasi awal atau klik di peta untuk memilih titik START" position="right">
-                <div>
-                  <TomTomSearchBox
-                    mode="start"
-                    icon={IconLocationPin}
-                    label="Titik Awal"
-                    value={startLabel}
-                    placeholder="Cari atau pilih di peta..."
-                    active={searchActiveMode === 'start' || (pickMode === 'start' && !tracking)}
-                    tracking={tracking}
-                    onSelect={onSearchSelect}
-                    userLat={myPos?.lat}
-                    userLon={myPos?.lng}
-                    onClickRow={() => {
-                      if (!tracking) {
-                        setSearchActiveMode(m => m === 'start' ? null : 'start')
-                        setPickMode('start')
-                        setMsg('Ketik nama tempat atau klik di peta untuk START.')
-                      }
-                    }}
-                  />
-                </div>
-              </Tooltip>
+              <TomTomSearchBox
+                mode="start"
+                icon={IconLocationPin}
+                label="Titik Awal"
+                value={startLabel}
+                placeholder="Cari atau pilih di peta..."
+                active={searchActiveMode === 'start' || (pickMode === 'start' && !tracking)}
+                tracking={tracking}
+                onSelect={onSearchSelect}
+                userLat={myPos?.lat}
+                userLon={myPos?.lng}
+                onClickRow={() => {
+                  if (!tracking) {
+                    setSearchActiveMode(m => m === 'start' ? null : 'start')
+                    setPickMode('start')
+                    setMsg('Ketik nama tempat atau klik di peta untuk START.')
+                  }
+                }}
+              />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10">
-                <Tooltip content="Tukar titik awal dan tujuan" position="right">
-                  <button
-                    type="button"
-                    className="flex h-7 w-7 items-center justify-center rounded-full border border-[#DDD8D0] bg-white shadow-sm text-[#6B6560] hover:bg-[#F4F2EF] transition"
-                    onClick={() => {
-                      setStart(end)
-                      setEnd(start)
-                      setStartAddr(endAddr)
-                      setEndAddr(startAddr)
-                    }}
-                  >
-                    <IconArrowSwap className="w-3.5 h-3.5" />
-                  </button>
-                </Tooltip>
+                <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[#DDD8D0] bg-white shadow-sm text-[#6B6560]">
+                  <IconArrowSwap className="w-3.5 h-3.5" />
+                </span>
               </div>
-              <Tooltip content="Cari lokasi tujuan atau klik di peta untuk memilih titik TUJUAN" position="right">
-                <div>
-                  <TomTomSearchBox
-                    mode="end"
-                    icon={IconFlag}
-                    label="Tujuan"
-                    value={endLabel}
-                    placeholder="Cari tempat tujuan..."
-                    active={searchActiveMode === 'end' || (pickMode === 'end' && !tracking)}
-                    tracking={tracking}
-                    onSelect={onSearchSelect}
-                    userLat={myPos?.lat}
-                    userLon={myPos?.lng}
-                    onClickRow={() => {
-                      if (!tracking) {
-                        setSearchActiveMode(m => m === 'end' ? null : 'end')
-                        setPickMode('end')
-                        setMsg('Ketik nama tempat atau klik di peta untuk TUJUAN.')
-                      }
-                    }}
-                  />
-                </div>
-              </Tooltip>
+              <TomTomSearchBox
+                mode="end"
+                icon={IconFlag}
+                label="Tujuan"
+                value={endLabel}
+                placeholder="Cari tempat tujuan..."
+                active={searchActiveMode === 'end' || (pickMode === 'end' && !tracking)}
+                tracking={tracking}
+                onSelect={onSearchSelect}
+                userLat={myPos?.lat}
+                userLon={myPos?.lng}
+                onClickRow={() => {
+                  if (!tracking) {
+                    setSearchActiveMode(m => m === 'end' ? null : 'end')
+                    setPickMode('end')
+                    setMsg('Ketik nama tempat atau klik di peta untuk TUJUAN.')
+                  }
+                }}
+              />
             </div>
           </div>
 
-          <Tooltip content="Gunakan lokasi GPS Anda saat ini sebagai titik awal (START)" position="top">
-            <button onClick={useMyLocationAsStart} disabled={geoPermission === 'denied'}
-              className={`w-full mt-2 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border transition text-sm font-bold ${
-                geoPermission === 'denied'
-                  ? 'bg-[#E8E0D6] text-[#A09890] border-[#DDD8D0] cursor-not-allowed'
-                  : myPos
-                  ? 'border-emerald-400 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                  : 'border-[#DDD8D0] bg-white hover:bg-[#F4F2EF] text-[#2B3440] hover:border-[#8b1a1a]/40'
-              }`}>
-              <IconMyLocation className={`w-4 h-4 ${myPos ? 'text-emerald-600' : 'text-[#8b1a1a]'}`} />
-              {myPos ? 'Pakai Lokasi GPS Saya (aktif)' : 'Pakai Lokasi Saya sebagai START'}
-            </button>
-          </Tooltip>
+          <button onClick={useMyLocationAsStart}
+            className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-[#DDD8D0] bg-white hover:bg-[#F4F2EF] text-[#2B3440] font-bold text-sm transition hover:border-[#8b1a1a]/40">
+            <IconMyLocation className="w-4 h-4 text-[#8b1a1a]" />Pakai Lokasi Saya sebagai START
+          </button>
 
           <SectionDivider label="Tujuan Event" />
           <div className="mb-1">
@@ -763,13 +698,11 @@ export default function UserMapPage() {
             </select>
 
             {selectedEventId && (
-              <Tooltip content="Atur lokasi event sebagai tujuan navigasi" position="top">
-                <button onClick={applyEventAsDestination}
-                  className={`w-full mt-2 flex items-center justify-center gap-2 px-3 py-2.5 font-bold rounded-xl text-sm border transition ${destinationType === 'event' ? 'bg-[#6b1414] text-white border-[#6b1414] ring-2 ring-[#8b1a1a]/40' : 'bg-[#8b1a1a] hover:bg-[#6b1414] text-white border-[#8b1a1a]'}`}>
-                  <IconMapPin className="w-3.5 h-3.5" />
-                  {destinationType === 'event' ? 'Lokasi Event Dipilih' : 'Tuju Lokasi Event'}
-                </button>
-              </Tooltip>
+              <button onClick={applyEventAsDestination}
+                className={`w-full mt-2 flex items-center justify-center gap-2 px-3 py-2.5 font-bold rounded-xl text-sm border transition ${destinationType === 'event' ? 'bg-[#6b1414] text-white border-[#6b1414] ring-2 ring-[#8b1a1a]/40' : 'bg-[#8b1a1a] hover:bg-[#6b1414] text-white border-[#8b1a1a]'}`}>
+                <IconMapPin className="w-3.5 h-3.5" />
+                {destinationType === 'event' ? 'Lokasi Event Dipilih' : 'Tuju Lokasi Event'}
+              </button>
             )}
 
             {selectedEventId && (
@@ -791,15 +724,13 @@ export default function UserMapPage() {
                       <option value="">-- pilih titik parkir --</option>
                       {spotsForSelectedEvent.map(s => <option key={s.id} value={s.id}>{s.name}{s.capacity ? ` (${s.capacity} kend.)` : ''}</option>)}
                     </select>
-                    <Tooltip content="Atur lokasi parkir sebagai tujuan navigasi" position="top">
-                      <button onClick={applyParkingAsDestination} disabled={!selectedParkingId}
-                        className={`w-full mt-2 flex items-center justify-center gap-2 px-3 py-2.5 font-bold rounded-xl text-sm border transition ${!selectedParkingId ? 'bg-[#F4F2EF] text-[#A09890] border-[#DDD8D0] cursor-not-allowed' : destinationType === 'parking' ? 'bg-blue-900 text-white border-blue-900 ring-2 ring-blue-400/40' : 'bg-blue-700 hover:bg-blue-800 text-white border-blue-700'}`}>
-                        <IconMapPin className="w-3.5 h-3.5" />
-                        {destinationType === 'parking' && selectedParkingId
-                          ? spotsForSelectedEvent.find(s => String(s.id) === String(selectedParkingId))?.name ?? 'Parkir Dipilih'
-                          : 'Tuju Titik Parkir'}
-                      </button>
-                    </Tooltip>
+                    <button onClick={applyParkingAsDestination} disabled={!selectedParkingId}
+                      className={`w-full mt-2 flex items-center justify-center gap-2 px-3 py-2.5 font-bold rounded-xl text-sm border transition ${!selectedParkingId ? 'bg-[#F4F2EF] text-[#A09890] border-[#DDD8D0] cursor-not-allowed' : destinationType === 'parking' ? 'bg-blue-900 text-white border-blue-900 ring-2 ring-blue-400/40' : 'bg-blue-700 hover:bg-blue-800 text-white border-blue-700'}`}>
+                      <IconMapPin className="w-3.5 h-3.5" />
+                      {destinationType === 'parking' && selectedParkingId
+                        ? spotsForSelectedEvent.find(s => String(s.id) === String(selectedParkingId))?.name ?? 'Parkir Dipilih'
+                        : 'Tuju Titik Parkir'}
+                    </button>
                   </>
                 )}
               </div>
@@ -835,48 +766,34 @@ export default function UserMapPage() {
             </div>
           )}
 
-          <Tooltip content="Hitung rute tercepat dan terpendek antara titik awal dan tujuan" position="top">
-            <div>
-              <SBtn onClick={() => findRoute()} disabled={loadingRoute || !canFindRoute || geoPermission === 'denied'}
-                cls={`mb-2 ${loadingRoute || !canFindRoute || geoPermission === 'denied' ? 'bg-[#C8C3BB] cursor-not-allowed' : 'bg-[#8b1a1a] hover:bg-[#6b1414] shadow-[0_4px_14px_rgba(139,26,26,0.30)]'}`}>
-                {loadingRoute ? <><span className="animate-spin border-2 border-white/30 border-t-white rounded-full w-4 h-4" />Menghitung Rute...</> : <><IconSearch className="w-4 h-4" />Cari Rute Terbaik</>}
-              </SBtn>
-            </div>
-          </Tooltip>
+          <SBtn onClick={() => findRoute()} disabled={loadingRoute || !canFindRoute}
+            cls={`mb-2 ${loadingRoute || !canFindRoute ? 'bg-[#C8C3BB] cursor-not-allowed' : 'bg-[#8b1a1a] hover:bg-[#6b1414] shadow-[0_4px_14px_rgba(139,26,26,0.30)]'}`}>
+            {loadingRoute ? <><span className="animate-spin border-2 border-white/30 border-t-white rounded-full w-4 h-4" />Menghitung Rute...</> : <><IconSearch className="w-4 h-4" />Cari Rute Terbaik</>}
+          </SBtn>
 
-          <Tooltip content={tracking ? "Hentikan navigasi GPS real-time" : "Mulai navigasi dengan GPS real-time dan panduan suara"} position="top">
-            <div>
-              <SBtn onClick={() => tracking ? stopTracking() : startTracking()} disabled={(!activeRoute && !tracking) || geoPermission === 'denied'}
-                cls={`mb-3 ${(!activeRoute && !tracking) || geoPermission === 'denied' ? 'bg-[#C8C3BB] cursor-not-allowed' : tracking ? 'bg-[#2B3440] hover:bg-gray-900' : 'bg-[#8b1a1a] hover:bg-[#6b1414] shadow-[0_4px_14px_rgba(139,26,26,0.30)]'}`}>
-                {tracking ? <><IconStop className="w-4 h-4" />Stop Navigasi</> : <><IconNavigation className="w-4 h-4" />Mulai Navigasi</>}
-              </SBtn>
-            </div>
-          </Tooltip>
+          <SBtn onClick={() => tracking ? stopTracking() : startTracking()} disabled={!activeRoute && !tracking}
+            cls={`mb-3 ${!activeRoute && !tracking ? 'bg-[#C8C3BB] cursor-not-allowed' : tracking ? 'bg-[#2B3440] hover:bg-gray-900' : 'bg-[#8b1a1a] hover:bg-[#6b1414] shadow-[0_4px_14px_rgba(139,26,26,0.30)]'}`}>
+            {tracking ? <><IconStop className="w-4 h-4" />Stop Navigasi</> : <><IconNavigation className="w-4 h-4" />Mulai Navigasi</>}
+          </SBtn>
 
           <div className="grid grid-cols-3 gap-2 mb-3">
-            <Tooltip content={followMe ? "Matikan ikuti lokasi" : "Aktifkan ikuti lokasi - peta akan mengikuti posisi Anda"} position="top">
-              <SecCtrl active={followMe} onClick={() => setFollowMe(v => !v)}
-                activeClass="bg-[#2B3440] text-white border-[#2B3440]"
-                inactiveClass="bg-white text-[#2B3440] border-[#DDD8D0] hover:bg-[#F4F2EF]">
-                <IconFollow className="w-4 h-4" />Ikuti {followMe ? 'ON' : 'OFF'}
-              </SecCtrl>
-            </Tooltip>
-            <Tooltip content={voiceOn ? "Matikan panduan suara" : "Aktifkan panduan suara - dengarkan instruksi navigasi"} position="top">
-              <SecCtrl active={voiceOn} onClick={() => setVoiceOn(v => !v)}
-                activeClass="bg-[#8b1a1a] text-white border-[#8b1a1a]"
-                inactiveClass="bg-white text-[#2B3440] border-[#DDD8D0] hover:bg-[#F4F2EF]">
-                {voiceOn ? <IconVolume className="w-4 h-4" /> : <IconVolumeMute className="w-4 h-4" />}
-                Suara {voiceOn ? 'ON' : 'OFF'}
-              </SecCtrl>
-            </Tooltip>
-            <Tooltip content="Ulangi instruksi navigasi saat ini" position="top">
-              <SecCtrl active={false}
-                onClick={() => { if (tracking && activeStep?.instruction && voiceOn) speak(activeStep.instruction, { lang: 'id-ID' }) }}
-                activeClass=""
-                inactiveClass={!tracking || !activeStep?.instruction || !voiceOn ? 'bg-[#F4F2EF] text-[#A09890] border-[#DDD8D0] cursor-not-allowed' : 'bg-white text-[#2B3440] border-[#DDD8D0] hover:bg-[#F4F2EF]'}>
-                <IconRepeat className="w-4 h-4" />Ulangi
-              </SecCtrl>
-            </Tooltip>
+            <SecCtrl active={followMe} onClick={() => setFollowMe(v => !v)}
+              activeClass="bg-[#2B3440] text-white border-[#2B3440]"
+              inactiveClass="bg-white text-[#2B3440] border-[#DDD8D0] hover:bg-[#F4F2EF]">
+              <IconFollow className="w-4 h-4" />Ikuti {followMe ? 'ON' : 'OFF'}
+            </SecCtrl>
+            <SecCtrl active={voiceOn} onClick={() => setVoiceOn(v => !v)}
+              activeClass="bg-[#8b1a1a] text-white border-[#8b1a1a]"
+              inactiveClass="bg-white text-[#2B3440] border-[#DDD8D0] hover:bg-[#F4F2EF]">
+              {voiceOn ? <IconVolume className="w-4 h-4" /> : <IconVolumeMute className="w-4 h-4" />}
+              Suara {voiceOn ? 'ON' : 'OFF'}
+            </SecCtrl>
+            <SecCtrl active={false}
+              onClick={() => { if (tracking && activeStep?.instruction && voiceOn) speak(activeStep.instruction, { lang: 'id-ID' }) }}
+              activeClass=""
+              inactiveClass={!tracking || !activeStep?.instruction || !voiceOn ? 'bg-[#F4F2EF] text-[#A09890] border-[#DDD8D0] cursor-not-allowed' : 'bg-white text-[#2B3440] border-[#DDD8D0] hover:bg-[#F4F2EF]'}>
+              <IconRepeat className="w-4 h-4" />Ulangi
+            </SecCtrl>
           </div>
 
           {hasRoutes && (
@@ -890,32 +807,26 @@ export default function UserMapPage() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {routeBtns.map(({ key, Icon, label, route, activeText, inactiveText }) => (
-                  <Tooltip 
-                    key={key}
-                    content={key === 'fastest' ? "Rute tercepat dengan waktu tempuh paling singkat" : "Rute terpendek dengan jarak paling pendek"}
-                    position="top"
-                  >
-                    <button type="button" disabled={!route || lockPickRoute}
-                      onClick={() => { setSelectedMode(key); if (route) { setSteps(Array.isArray(route.steps) ? route.steps : []); setStepIdx(0) } }}
-                      className={`w-full text-left px-3 py-2.5 rounded-xl border transition ${selectedMode === key ? 'bg-[#2B3440] text-white border-[#2B3440]' : 'bg-white text-[#2B3440] border-[#DDD8D0] hover:bg-[#F4F2EF]'} ${!route || lockPickRoute ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${selectedMode === key ? activeText : inactiveText}`} />
-                        <span className="font-extrabold text-xs">{label}</span>
-                      </div>
-                      <p className={`text-xs font-bold ${selectedMode === key ? 'text-white' : 'text-[#2B3440]'}`}>{fmtMin(route?.total_time_sec)}</p>
-                      <p className={`text-[10px] font-semibold ${selectedMode === key ? 'text-white/75' : 'text-[#6B6560]'}`}>{fmtKm(route?.total_length_m)}</p>
-                      {hasCongestion && key === 'fastest' && (
-                        <p className={`text-[9px] mt-1 font-bold ${selectedMode === key ? 'text-emerald-300' : 'text-emerald-600'}`}>
-                          ✓ hindari {congestionZones.length} zona macet
-                        </p>
-                      )}
-                      {hasCongestion && key === 'shortest' && (
-                        <p className={`text-[9px] mt-1 font-bold ${selectedMode === key ? 'text-orange-300' : 'text-orange-500'}`}>
-                          ⚠ abaikan kemacetan
-                        </p>
-                      )}
-                    </button>
-                  </Tooltip>
+                  <button key={key} type="button" disabled={!route || lockPickRoute}
+                    onClick={() => { setSelectedMode(key); if (route) { setSteps(Array.isArray(route.steps) ? route.steps : []); setStepIdx(0) } }}
+                    className={`text-left px-3 py-2.5 rounded-xl border transition ${selectedMode === key ? 'bg-[#2B3440] text-white border-[#2B3440]' : 'bg-white text-[#2B3440] border-[#DDD8D0] hover:bg-[#F4F2EF]'} ${!route || lockPickRoute ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${selectedMode === key ? activeText : inactiveText}`} />
+                      <span className="font-extrabold text-xs">{label}</span>
+                    </div>
+                    <p className={`text-xs font-bold ${selectedMode === key ? 'text-white' : 'text-[#2B3440]'}`}>{fmtMin(route?.total_time_sec)}</p>
+                    <p className={`text-[10px] font-semibold ${selectedMode === key ? 'text-white/75' : 'text-[#6B6560]'}`}>{fmtKm(route?.total_length_m)}</p>
+                    {hasCongestion && key === 'fastest' && (
+                      <p className={`text-[9px] mt-1 font-bold ${selectedMode === key ? 'text-emerald-300' : 'text-emerald-600'}`}>
+                        ✓ hindari {congestionZones.length} zona macet
+                      </p>
+                    )}
+                    {hasCongestion && key === 'shortest' && (
+                      <p className={`text-[9px] mt-1 font-bold ${selectedMode === key ? 'text-orange-300' : 'text-orange-500'}`}>
+                        ⚠ abaikan kemacetan
+                      </p>
+                    )}
+                  </button>
                 ))}
               </div>
             </div>
@@ -970,12 +881,7 @@ export default function UserMapPage() {
 
         <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ height: '100%', width: '100%' }}>
           <MapRefSetter mapRef={mapRef} />
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            subdomains="abc"
-            maxZoom={19}
-          />
+          <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           <ClickSetter mode={pickMode} onPick={onPick} />
           <MapLayers
             myPos={myPos} bearing={bearing} start={start} end={end}
