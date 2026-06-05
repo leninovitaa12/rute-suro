@@ -457,3 +457,5 @@ export function AdminTentang() {
     </div>
   )
 }
+
+export default AdminSejarah

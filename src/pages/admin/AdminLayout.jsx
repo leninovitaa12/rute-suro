@@ -31,6 +31,7 @@ export default function AdminLayout({ children }) {
     },
   ]
 
+  // ── DITAMBAH: Berita dan Destinasi di dropdown Manajemen Konten ──
   const contentMenuItems = [
     {
       name: 'Sejarah',
@@ -41,6 +42,16 @@ export default function AdminLayout({ children }) {
       name: 'Tentang',
       path: '/admin/dashboard/tentang',
       icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    },
+    {
+      name: 'Berita',
+      path: '/admin/dashboard/berita',
+      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>,
+    },
+    {
+      name: 'Destinasi',
+      path: '/admin/dashboard/destinasi',
+      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
     },
   ]
 
@@ -72,6 +83,7 @@ export default function AdminLayout({ children }) {
 
   const activePageName =
     mainMenuItems.find((i) => isActive(i.path))?.name ||
+    contentMenuItems.find((i) => isActive(i.path))?.name ||
     (isActive('/admin/dashboard') ? 'Dashboard' : '') ||
     (isContentActive ? 'Manajemen Konten' : 'Dashboard Admin')
 
@@ -121,7 +133,6 @@ export default function AdminLayout({ children }) {
           font-weight: 700;
           background: transparent !important;
         }
-        /* underline hanya di active */
         .nav-link.active::after {
           content: '';
           position: absolute;
@@ -163,7 +174,6 @@ export default function AdminLayout({ children }) {
           content: '';
           position: absolute;
           bottom: 0px;
-          /* exclude the chevron icon from underline width */
           left: 14px;
           right: 34px;
           height: 2.5px;
@@ -194,6 +204,11 @@ export default function AdminLayout({ children }) {
           font-weight: 700;
           border-left: 3px solid #b91c1c;
           padding-left: 13px;
+        }
+        .dd-divider {
+          height: 1px;
+          background: #f3f4f6;
+          margin: 4px 0;
         }
       `}</style>
 
@@ -254,7 +269,7 @@ export default function AdminLayout({ children }) {
 
                 {contentMenuOpen && (
                   <div
-                    className="drop-in absolute top-[calc(100%+4px)] left-0 w-52 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden"
+                    className="drop-in absolute top-[calc(100%+4px)] left-0 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden"
                     style={{ zIndex: 10000 }}
                   >
                     {contentMenuItems.map((item) => (
@@ -269,9 +284,43 @@ export default function AdminLayout({ children }) {
                         {item.name}
                       </Link>
                     ))}
+
+                    {/* Divider + link ke halaman publik */}
+                    <div className="dd-divider" />
+                    <div style={{ padding: '6px 10px 8px' }}>
+                      <p style={{ fontSize: '0.65rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: 6, marginBottom: 2 }}>
+                        Lihat Halaman Publik
+                      </p>
+                      <a href="/berita" target="_blank" rel="noopener noreferrer" className="dd-item" style={{ padding: '8px 6px', borderRadius: 6 }}>
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        <span style={{ fontSize: '0.8rem' }}>Halaman Berita</span>
+                      </a>
+                      <a href="/sejarah" target="_blank" rel="noopener noreferrer" className="dd-item" style={{ padding: '8px 6px', borderRadius: 6 }}>
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        <span style={{ fontSize: '0.8rem' }}>Halaman Sejarah</span>
+                      </a>
+                    </div>
                   </div>
                 )}
               </div>
+
+              {/* ── Tombol View Site (lihat halaman publik) ── */}
+              <a
+                href="/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="nav-link"
+                title="Buka halaman publik"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                View Site
+              </a>
             </nav>
 
             {/* Logout */}
