@@ -3,13 +3,28 @@ import { Plus, Trash2, Edit2, AlertCircle, ExternalLink, MapPin, Eye, EyeOff, Re
 import { supabase } from '../../lib/supabase'
 import dayjs from 'dayjs'
 
-const KATEGORI_LIST = ['Festival', 'System', 'Destinasi', 'Lalu Lintas', 'Budaya', 'Umum']
+// Hapus 'System' dari kategori
+const KATEGORI_LIST = ['Festival', 'Destinasi', 'Lalu Lintas', 'Budaya', 'Umum']
 
 const EMPTY_FORM = {
   id: null, judul: '', isi: '', kategori: 'Umum',
-  embed_url: '', thumbnail: '',
+  embed_url: '',
   lokasi_lat: '', lokasi_lng: '', lokasi_nama: '',
   published: true,
+}
+
+// Ekstrak thumbnail otomatis dari URL embed
+function extractThumbnail(url) {
+  if (!url) return null
+  try {
+    // YouTube
+    const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+    if (ytMatch) return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`
+    // Tidak bisa ekstrak → null (tidak ada thumbnail)
+    return null
+  } catch {
+    return null
+  }
 }
 
 export default function AdminBerita() {
@@ -26,7 +41,6 @@ export default function AdminBerita() {
     setTimeout(() => setMsg({ text: '', type: 'success' }), 4000)
   }
 
-  // ── Fetch (admin lihat semua, termasuk draft) ──────────────────
   const load = useCallback(async () => {
     const { data, error } = await supabase
       .from('berita')
@@ -38,17 +52,19 @@ export default function AdminBerita() {
 
   useEffect(() => { load() }, [load])
 
-  // ── Save ───────────────────────────────────────────────────────
   async function save() {
     if (!form.judul.trim()) { showMsg('Judul wajib diisi', 'error'); return }
     if (!form.isi.trim())   { showMsg('Isi berita wajib diisi', 'error'); return }
+
+    // Thumbnail otomatis dari embed_url
+    const thumbnail = extractThumbnail(form.embed_url)
 
     const payload = {
       judul:       form.judul.trim(),
       isi:         form.isi.trim(),
       kategori:    form.kategori,
       embed_url:   form.embed_url.trim()  || null,
-      thumbnail:   form.thumbnail.trim()  || null,
+      thumbnail:   thumbnail,
       lokasi_lat:  form.lokasi_lat !== '' ? parseFloat(form.lokasi_lat) : null,
       lokasi_lng:  form.lokasi_lng !== '' ? parseFloat(form.lokasi_lng) : null,
       lokasi_nama: form.lokasi_nama.trim() || null,
@@ -58,21 +74,14 @@ export default function AdminBerita() {
     setLoading(true)
     try {
       if (form.id) {
-        // UPDATE
         const { data, error } = await supabase
-          .from('berita')
-          .update(payload)
-          .eq('id', form.id)
-          .select()
+          .from('berita').update(payload).eq('id', form.id).select()
         if (error) throw error
-        if (!data || data.length === 0) throw new Error('Update gagal: tidak ada baris yang diperbarui. Cek RLS policy di Supabase.')
+        if (!data || data.length === 0) throw new Error('Update gagal: cek RLS policy di Supabase.')
         showMsg('Berita diperbarui ✅')
       } else {
-        // INSERT
         const { data, error } = await supabase
-          .from('berita')
-          .insert([payload])
-          .select()
+          .from('berita').insert([payload]).select()
         if (error) throw error
         if (!data || data.length === 0) throw new Error('Insert gagal: cek RLS policy di Supabase.')
         showMsg('Berita disimpan ✅')
@@ -86,7 +95,6 @@ export default function AdminBerita() {
     }
   }
 
-  // ── Delete ─────────────────────────────────────────────────────
   async function del(id) {
     if (!confirm('Yakin hapus berita ini?')) return
     const { error } = await supabase.from('berita').delete().eq('id', id)
@@ -94,12 +102,9 @@ export default function AdminBerita() {
     else { showMsg('Berita dihapus'); await load() }
   }
 
-  // ── Toggle published ───────────────────────────────────────────
   async function togglePublished(item) {
     const { error } = await supabase
-      .from('berita')
-      .update({ published: !item.published })
-      .eq('id', item.id)
+      .from('berita').update({ published: !item.published }).eq('id', item.id)
     if (error) showMsg('Gagal update: ' + error.message, 'error')
     else await load()
   }
@@ -111,7 +116,6 @@ export default function AdminBerita() {
       isi:         item.isi,
       kategori:    item.kategori,
       embed_url:   item.embed_url   || '',
-      thumbnail:   item.thumbnail   || '',
       lokasi_lat:  item.lokasi_lat  ?? '',
       lokasi_lng:  item.lokasi_lng  ?? '',
       lokasi_nama: item.lokasi_nama || '',
@@ -126,12 +130,11 @@ export default function AdminBerita() {
   const inputCls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
 
   const KATEGORI_COLOR = {
-    'Festival':     'bg-red-100 text-red-700',
-    'System':       'bg-blue-100 text-blue-700',
-    'Destinasi':    'bg-purple-100 text-purple-700',
-    'Lalu Lintas':  'bg-orange-100 text-orange-700',
-    'Budaya':       'bg-pink-100 text-pink-700',
-    'Umum':         'bg-gray-100 text-gray-600',
+    'Festival':    'bg-red-100 text-red-700',
+    'Destinasi':   'bg-purple-100 text-purple-700',
+    'Lalu Lintas': 'bg-orange-100 text-orange-700',
+    'Budaya':      'bg-pink-100 text-pink-700',
+    'Umum':        'bg-gray-100 text-gray-600',
   }
 
   return (
@@ -149,7 +152,7 @@ export default function AdminBerita() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* ── FORM ─────────────────────────────────────────────── */}
+        {/* ── FORM ── */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl shadow-sm p-6 sticky top-24 space-y-4">
             <h3 className="text-lg font-bold text-gray-800">{form.id ? 'Edit Berita' : 'Tambah Berita Baru'}</h3>
@@ -173,23 +176,27 @@ export default function AdminBerita() {
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                URL Thumbnail <span className="font-normal text-xs text-gray-400">(opsional)</span>
-              </label>
-              <input className={inputCls} placeholder="https://..." value={form.thumbnail}
-                onChange={e => f('thumbnail', e.target.value)} />
-              {form.thumbnail && (
-                <img src={form.thumbnail} alt="preview" className="mt-2 w-full h-24 object-cover rounded-lg" onError={e => e.target.style.display='none'} />
-              )}
-            </div>
-
+            {/* Hanya satu field link — thumbnail otomatis diambil dari sini */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Link Berita / Embed URL <span className="font-normal text-xs text-gray-400">(opsional)</span>
               </label>
-              <input className={inputCls} type="url" placeholder="https://..." value={form.embed_url}
-                onChange={e => f('embed_url', e.target.value)} />
+              <input className={inputCls} type="url" placeholder="https://..."
+                value={form.embed_url} onChange={e => f('embed_url', e.target.value)} />
+
+              {/* Preview thumbnail yang akan di-generate otomatis */}
+              {form.embed_url && extractThumbnail(form.embed_url) && (
+                <div className="mt-2">
+                  <p className="text-xs text-gray-400 mb-1">Thumbnail otomatis:</p>
+                  <img
+                    src={extractThumbnail(form.embed_url)}
+                    alt="thumbnail"
+                    className="w-full h-24 object-cover rounded-lg"
+                    onError={e => e.target.style.display = 'none'}
+                  />
+                </div>
+              )}
+
               {form.embed_url && (
                 <button onClick={() => setPreview(v => !v)}
                   className="flex items-center gap-1 mt-1 text-xs text-primary hover:underline">
@@ -233,7 +240,7 @@ export default function AdminBerita() {
             <div className="space-y-2 pt-2">
               <button onClick={save} disabled={loading}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors font-semibold text-sm disabled:opacity-60">
-                <Plus size={16} /> {form.id ? 'Update Berita' : 'Simpan Berita'}
+                <Plus size={16} /> {form.id ? 'Update Berita' : '+ Simpan Berita'}
               </button>
               <button onClick={resetForm}
                 className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold text-sm">
@@ -243,7 +250,7 @@ export default function AdminBerita() {
           </div>
         </div>
 
-        {/* ── DAFTAR BERITA ─────────────────────────────────────── */}
+        {/* ── DAFTAR BERITA ── */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">

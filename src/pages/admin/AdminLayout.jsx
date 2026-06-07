@@ -31,7 +31,6 @@ export default function AdminLayout({ children }) {
     },
   ]
 
-  // ── DITAMBAH: Berita dan Destinasi di dropdown Manajemen Konten ──
   const contentMenuItems = [
     {
       name: 'Sejarah',
@@ -96,119 +95,48 @@ export default function AdminLayout({ children }) {
         .drop-in      { animation: dropIn 0.18s ease-out; }
 
         .leaflet-pane,
-        .leaflet-top,
-        .leaflet-bottom,
-        .leaflet-control,
-        .leaflet-overlay-pane,
-        .leaflet-tile-pane,
-        .leaflet-marker-pane,
-        .leaflet-popup-pane,
+        .leaflet-top, .leaflet-bottom, .leaflet-control,
+        .leaflet-overlay-pane, .leaflet-tile-pane,
+        .leaflet-marker-pane, .leaflet-popup-pane,
         .leaflet-shadow-pane { z-index: 1 !important; }
         .leaflet-tooltip-pane { z-index: 2 !important; }
         .leaflet-popup-pane   { z-index: 3 !important; }
 
-        /* ── Navbar links: UNDERLINE ONLY, zero background ─────────────────── */
         .nav-link {
-          position: relative;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 14px;
-          padding-bottom: 8px;
-          font-size: 0.875rem;
-          font-weight: 500;
-          color: rgba(255,255,255,0.65);
-          text-decoration: none;
-          background: transparent !important;
-          border: none;
-          white-space: nowrap;
-          transition: color 0.15s;
+          position: relative; display: inline-flex; align-items: center; gap: 6px;
+          padding: 6px 14px 8px; font-size: 0.875rem; font-weight: 500;
+          color: rgba(255,255,255,0.65); text-decoration: none;
+          background: transparent !important; border: none; white-space: nowrap; transition: color 0.15s;
         }
-        .nav-link:hover {
-          color: #ffffff;
-          background: transparent !important;
-        }
-        .nav-link.active {
-          color: #ffffff;
-          font-weight: 700;
-          background: transparent !important;
-        }
+        .nav-link:hover { color: #ffffff; background: transparent !important; }
+        .nav-link.active { color: #ffffff; font-weight: 700; background: transparent !important; }
         .nav-link.active::after {
-          content: '';
-          position: absolute;
-          bottom: 0px;
-          left: 14px;
-          right: 14px;
-          height: 2.5px;
-          border-radius: 2px 2px 0 0;
-          background: #ffffff;
+          content: ''; position: absolute; bottom: 0px; left: 14px; right: 14px;
+          height: 2.5px; border-radius: 2px 2px 0 0; background: #ffffff;
         }
 
-        /* ── Navbar dropdown trigger button ─────────────────────────────────── */
         .nav-btn {
-          position: relative;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 14px;
-          padding-bottom: 8px;
-          font-size: 0.875rem;
-          font-weight: 500;
-          color: rgba(255,255,255,0.65);
-          background: transparent !important;
-          border: none;
-          cursor: pointer;
-          white-space: nowrap;
-          transition: color 0.15s;
+          position: relative; display: inline-flex; align-items: center; gap: 6px;
+          padding: 6px 14px 8px; font-size: 0.875rem; font-weight: 500;
+          color: rgba(255,255,255,0.65); background: transparent !important;
+          border: none; cursor: pointer; white-space: nowrap; transition: color 0.15s;
         }
-        .nav-btn:hover {
-          color: #ffffff;
-          background: transparent !important;
-        }
-        .nav-btn.active {
-          color: #ffffff;
-          font-weight: 700;
-          background: transparent !important;
-        }
+        .nav-btn:hover { color: #ffffff; background: transparent !important; }
+        .nav-btn.active { color: #ffffff; font-weight: 700; background: transparent !important; }
         .nav-btn.active::after {
-          content: '';
-          position: absolute;
-          bottom: 0px;
-          left: 14px;
-          right: 34px;
-          height: 2.5px;
-          border-radius: 2px 2px 0 0;
-          background: #ffffff;
+          content: ''; position: absolute; bottom: 0px; left: 14px; right: 34px;
+          height: 2.5px; border-radius: 2px 2px 0 0; background: #ffffff;
         }
 
-        /* ── Dropdown items ──────────────────────────────────────────────────── */
         .dd-item {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 11px 16px;
-          font-size: 0.875rem;
-          font-weight: 500;
-          color: #374151;
-          text-decoration: none;
-          transition: background 0.12s, color 0.12s;
-          cursor: pointer;
+          display: flex; align-items: center; gap: 10px; padding: 11px 16px;
+          font-size: 0.875rem; font-weight: 500; color: #374151;
+          text-decoration: none; transition: background 0.12s, color 0.12s; cursor: pointer;
         }
-        .dd-item:hover {
-          background: #fef2f2;
-          color: #b91c1c;
-        }
+        .dd-item:hover { background: #fef2f2; color: #b91c1c; }
         .dd-item.active {
-          background: #fef2f2;
-          color: #b91c1c;
-          font-weight: 700;
-          border-left: 3px solid #b91c1c;
-          padding-left: 13px;
-        }
-        .dd-divider {
-          height: 1px;
-          background: #f3f4f6;
-          margin: 4px 0;
+          background: #fef2f2; color: #b91c1c; font-weight: 700;
+          border-left: 3px solid #b91c1c; padding-left: 13px;
         }
       `}</style>
 
@@ -228,10 +156,7 @@ export default function AdminLayout({ children }) {
 
             {/* Nav */}
             <nav className="hidden md:flex items-center gap-1 flex-1 justify-center">
-              <Link
-                to="/admin/dashboard"
-                className={`nav-link ${isActive('/admin/dashboard') ? 'active' : ''}`}
-              >
+              <Link to="/admin/dashboard" className={`nav-link ${isActive('/admin/dashboard') ? 'active' : ''}`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
@@ -239,16 +164,12 @@ export default function AdminLayout({ children }) {
               </Link>
 
               {mainMenuItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`nav-link ${isActive(item.path) ? 'active' : ''}`}
-                >
+                <Link key={item.path} to={item.path} className={`nav-link ${isActive(item.path) ? 'active' : ''}`}>
                   {item.icon}{item.name}
                 </Link>
               ))}
 
-              {/* Content dropdown */}
+              {/* Dropdown Manajemen Konten — TANPA link halaman publik */}
               <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"
@@ -259,10 +180,8 @@ export default function AdminLayout({ children }) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   Manajemen Konten
-                  <svg
-                    className={`w-3.5 h-3.5 transition-transform duration-200 ${contentMenuOpen ? 'rotate-180' : ''}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
+                  <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${contentMenuOpen ? 'rotate-180' : ''}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
@@ -273,49 +192,19 @@ export default function AdminLayout({ children }) {
                     style={{ zIndex: 10000 }}
                   >
                     {contentMenuItems.map((item) => (
-                      <Link
-                        key={item.path}
-                        to={item.path}
-                        className={`dd-item ${isActive(item.path) ? 'active' : ''}`}
-                      >
+                      <Link key={item.path} to={item.path} className={`dd-item ${isActive(item.path) ? 'active' : ''}`}>
                         <span className={isActive(item.path) ? 'text-red-600' : 'text-gray-400'}>
                           {item.icon}
                         </span>
                         {item.name}
                       </Link>
                     ))}
-
-                    {/* Divider + link ke halaman publik */}
-                    <div className="dd-divider" />
-                    <div style={{ padding: '6px 10px 8px' }}>
-                      <p style={{ fontSize: '0.65rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: 6, marginBottom: 2 }}>
-                        Lihat Halaman Publik
-                      </p>
-                      <a href="/berita" target="_blank" rel="noopener noreferrer" className="dd-item" style={{ padding: '8px 6px', borderRadius: 6 }}>
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                        <span style={{ fontSize: '0.8rem' }}>Halaman Berita</span>
-                      </a>
-                      <a href="/sejarah" target="_blank" rel="noopener noreferrer" className="dd-item" style={{ padding: '8px 6px', borderRadius: 6 }}>
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                        <span style={{ fontSize: '0.8rem' }}>Halaman Sejarah</span>
-                      </a>
-                    </div>
                   </div>
                 )}
               </div>
 
-              {/* ── Tombol View Site (lihat halaman publik) ── */}
-              <a
-                href="/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="nav-link"
-                title="Buka halaman publik"
-              >
+              {/* View Site */}
+              <a href="/" target="_blank" rel="noopener noreferrer" className="nav-link" title="Buka halaman publik">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
@@ -325,10 +214,8 @@ export default function AdminLayout({ children }) {
 
             {/* Logout */}
             <div className="flex items-center gap-3 flex-shrink-0">
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1.5 px-4 py-2 bg-white text-red-700 text-sm font-bold rounded-lg hover:bg-red-50 active:scale-95 transition-all duration-150 shadow-sm"
-              >
+              <button onClick={handleLogout}
+                className="flex items-center gap-1.5 px-4 py-2 bg-white text-red-700 text-sm font-bold rounded-lg hover:bg-red-50 active:scale-95 transition-all duration-150 shadow-sm">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
@@ -338,7 +225,7 @@ export default function AdminLayout({ children }) {
           </div>
         </div>
 
-        {/* Breadcrumb bar */}
+        {/* Breadcrumb */}
         <div className="bg-black/15 border-t border-white/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 flex items-center gap-2">
             <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -353,10 +240,7 @@ export default function AdminLayout({ children }) {
         </div>
       </header>
 
-      <main
-        className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8"
-        style={{ isolation: 'isolate' }}
-      >
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8" style={{ isolation: 'isolate' }}>
         {children}
       </main>
 
