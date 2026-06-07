@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 
 export default function Navbar() {
@@ -6,22 +6,19 @@ export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false)
   const location = useLocation()
 
-  // ✅ aman untuk /map, /map/, dll (query tidak ikut pathname)
   const isMapPage = location.pathname.startsWith('/map')
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 40)
-    }
+    const handleScroll = () => setIsScrolled(window.scrollY > 40)
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
   const navLinks = [
-    { to: '/', label: 'Home' },
-    { to: '/map', label: 'Map' },
+    { to: '/',        label: 'Home' },
+    { to: '/map',     label: 'Map' },
     { to: '/sejarah', label: 'Sejarah' },
-    { to: '/jadwal', label: 'Jadwal' },
+    { to: '/jadwal',  label: 'Jadwal' },
     { to: '/tentang', label: 'Tentang' },
   ]
 
@@ -33,14 +30,12 @@ export default function Navbar() {
   return (
     <nav
       className={`
-        fixed top-0 w-full text-white transition-all duration-300
-        z-[10000]
-        ${
-          isMapPage
-            ? 'bg-red-800 shadow-lg'
-            : isScrolled
-            ? 'bg-red-800/95 shadow-lg backdrop-blur-sm'
-            : 'bg-transparent'
+        fixed top-0 w-full text-white transition-all duration-300 z-[10000]
+        ${isMapPage
+          ? 'bg-red-800 shadow-lg'
+          : isScrolled
+          ? 'bg-red-800/95 shadow-lg backdrop-blur-sm'
+          : 'bg-transparent'
         }
       `}
     >
@@ -53,14 +48,8 @@ export default function Navbar() {
           from { transform: translateX(20px); opacity: 0; }
           to   { transform: translateX(0);   opacity: 1; }
         }
-        @keyframes glowPulse {
-          0%,100% { text-shadow: 0 0 5px rgba(255,255,255,0); }
-          50%      { text-shadow: 0 0 8px rgba(252,165,165,0.5); }
-        }
-
         .navbar-enter { animation: slideDown 0.5s ease-out; }
 
-        /* ── desktop nav link ── */
         .nav-link {
           position: relative;
           font-weight: 600;
@@ -85,11 +74,9 @@ export default function Navbar() {
         }
         .nav-link:hover { color: #fca5a5; transform: translateY(-1px); }
         .nav-link:hover::after { width: 100%; }
-
         .nav-link.active { color: #fca5a5; }
         .nav-link.active::after { width: 100%; }
 
-        /* ── mobile menu ── */
         .mobile-menu-enter { animation: slideDown 0.35s ease-out; }
         .menu-item { animation: slideInRight 0.4s ease-out forwards; opacity: 0; }
         .menu-item:nth-child(1) { animation-delay: 0.05s; }
@@ -97,7 +84,6 @@ export default function Navbar() {
         .menu-item:nth-child(3) { animation-delay: 0.15s; }
         .menu-item:nth-child(4) { animation-delay: 0.20s; }
         .menu-item:nth-child(5) { animation-delay: 0.25s; }
-        .menu-item:nth-child(6) { animation-delay: 0.30s; }
 
         .mobile-link {
           display: block;
@@ -106,8 +92,7 @@ export default function Navbar() {
           text-decoration: none;
           border-radius: 8px;
           font-weight: 600;
-          position: relative;
-          transition: background 0.25s, transform 0.2s, box-shadow 0.2s;
+          transition: background 0.25s, transform 0.2s;
           border-left: 2px solid transparent;
         }
         .mobile-link:hover {
@@ -119,68 +104,45 @@ export default function Navbar() {
           border-left-color: #fca5a5;
           color: #fca5a5;
         }
-
-        /* admin button */
-        .btn-admin {
-          padding: 8px 22px;
-          border: 1.5px solid rgba(255,255,255,0.5);
-          border-radius: 6px;
-          color: white;
-          font-weight: 700;
-          font-size: 14px;
-          text-decoration: none;
-          background: transparent;
-          position: relative; overflow: hidden;
-          transition: color 0.25s, border-color 0.25s, transform 0.2s, box-shadow 0.2s;
-        }
-        .btn-admin::before {
-          content: '';
-          position: absolute; inset: 0;
-          background: rgba(255,255,255,0.15);
-          transform: scaleX(0); transform-origin: left;
-          transition: transform 0.3s ease;
-        }
-        .btn-admin:hover::before { transform: scaleX(1); }
-        .btn-admin:hover { border-color: white; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.2); }
-
-        .logo-hover { transition: opacity 0.2s, transform 0.2s; }
-        .logo-hover:hover { opacity: 0.85; transform: scale(1.05); }
       `}</style>
 
       <div className="max-w-6xl mx-auto px-4 navbar-enter">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center h-16">
 
-          {/* Brand */}
-          <Link
-            to="/"
-            onClick={() => setIsMenuOpen(false)}
-            className="font-black text-xl text-white logo-hover"
-          >
-            RUTE SURO
-          </Link>
+          {/* Brand — kiri, lebar tetap agar links bisa center */}
+          <div className="w-36 flex-shrink-0">
+            <Link
+              to="/"
+              onClick={() => setIsMenuOpen(false)}
+              className="font-black text-xl text-white"
+              style={{ transition: 'opacity 0.2s, transform 0.2s' }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.transform = 'scale(1.05)' }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1)' }}
+            >
+              RUTE SURO
+            </Link>
+          </div>
 
-          {/* Desktop links */}
-          <div className="hidden md:flex items-center gap-7">
+          {/* Desktop links — benar-benar center */}
+          <div className="hidden md:flex flex-1 items-center justify-center gap-7">
             {navLinks.map(({ to, label }) => (
               <Link
                 key={to}
                 to={to}
                 className={`nav-link${isActive(to) ? ' active' : ''}`}
-                style={{ outline: 'none', boxShadow: 'none' }}
               >
                 {label}
               </Link>
             ))}
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-4">
-            <Link to="/admin" className="btn-admin hidden md:inline-flex items-center">
-              Admin Login
-            </Link>
+          {/* Spacer kanan — sama lebar dengan brand agar links tetap center */}
+          <div className="w-36 flex-shrink-0 hidden md:block" />
 
+          {/* Mobile toggle — kanan */}
+          <div className="flex-1 flex justify-end md:hidden">
             <button
-              className="md:hidden text-white p-2 text-2xl transition-transform hover:scale-110 active:scale-95"
+              className="text-white p-2 text-2xl transition-transform hover:scale-110 active:scale-95"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-label="Toggle menu"
             >
@@ -203,14 +165,6 @@ export default function Navbar() {
                   {label}
                 </Link>
               ))}
-              <Link
-                to="/admin"
-                className="menu-item mobile-link mt-1"
-                style={{ border: '1.5px solid rgba(255,255,255,0.3)', textAlign: 'center' }}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Admin Login
-              </Link>
             </div>
           </div>
         )}
