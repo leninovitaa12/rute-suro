@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { api } from '../../lib/api.js'
+import { supabase } from '../../lib/supabase'
 import { usePoiSearch } from '../../hooks/usePoiSearch.js'
 import RightDockPanel from '../../components/RightDockPanel.jsx'
 import MapLayers, { ClickSetter } from '../../components/map/MapLayers.jsx'
@@ -306,14 +307,33 @@ export default function UserMapPage() {
     ;(async () => {
       setLoadingBootstrap(true); setLoadingEvents(true); setLoadingClosures(true)
       try {
+        // Events & parking tetap dari Flask bootstrap
         const { data } = await api.get('/map-bootstrap')
         if (!alive) return
         setEvents(Array.isArray(data.events) ? data.events : [])
-        const cl = Array.isArray(data.closures_active) ? data.closures_active : []
-        setClosures(cl)
-        closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
         setParkingSpots(Array.isArray(data.parking_spots) ? data.parking_spots : [])
-        setCongestionZones(filterActiveZones(data.congestion_active))
+
+        // Closures — langsung dari Supabase agar selalu segar
+        const { data: clData, error: clErr } = await supabase
+          .from('closures')
+          .select('*')
+          .eq('is_active', true)
+        if (!alive) return
+        if (!clErr) {
+          const cl = filterActiveZones(clData || [])
+          setClosures(cl)
+          closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
+        }
+
+        // Congestion — langsung dari Supabase
+        const { data: cgData, error: cgErr } = await supabase
+          .from('congestion_zones')
+          .select('*')
+          .eq('is_active', true)
+        if (!alive) return
+        if (!cgErr) {
+          setCongestionZones(filterActiveZones(cgData || []))
+        }
       } catch (e) {
         if (!alive) return
         setMsg('Gagal memuat data peta: ' + (e?.response?.data?.error || e.message))
@@ -387,11 +407,22 @@ export default function UserMapPage() {
     if (!silent) setMsg('Memuat rekayasa jalan...')
     setLoadingClosures(true)
     try {
-      const { data } = await api.get('/map-bootstrap')
-      const cl = Array.isArray(data?.closures_active) ? data.closures_active : []
-      setClosures(cl)
-      closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
-      setCongestionZones(filterActiveZones(data?.congestion_active))
+      // Closures langsung dari Supabase
+      const { data: clData, error: clErr } = await supabase
+        .from('closures')
+        .select('*')
+        .eq('is_active', true)
+      if (!clErr) {
+        const cl = filterActiveZones(clData || [])
+        setClosures(cl)
+        closuresCacheRef.current = { data: cl, fetchedAt: Date.now() }
+      }
+      // Congestion langsung dari Supabase
+      const { data: cgData, error: cgErr } = await supabase
+        .from('congestion_zones')
+        .select('*')
+        .eq('is_active', true)
+      if (!cgErr) setCongestionZones(filterActiveZones(cgData || []))
     } catch (e) { console.warn('refreshClosures failed:', e) }
     finally { setLoadingClosures(false) }
   }

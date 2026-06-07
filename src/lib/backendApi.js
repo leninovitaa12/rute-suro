@@ -409,3 +409,32 @@ export async function deletePoster(id) {
   if (error) throw error
   return true
 }
+
+// SUPABASE STORAGE — Upload & Delete gambar poster
+const POSTER_BUCKET = 'posters'
+
+export const uploadPosterImage = async (file) => {
+  const ext  = file.name.split('.').pop().toLowerCase()
+  const name = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+  const path = `images/${name}`
+
+  const { error: upErr } = await supabase.storage
+    .from(POSTER_BUCKET)
+    .upload(path, file, { cacheControl: '3600', upsert: false })
+
+  if (upErr) throw new Error('Upload gagal: ' + upErr.message)
+
+  const { data } = supabase.storage.from(POSTER_BUCKET).getPublicUrl(path)
+  return data.publicUrl
+}
+
+export const deletePosterImage = async (imageUrl) => {
+  try {
+    const url  = new URL(imageUrl)
+    const path = url.pathname.split(`/${POSTER_BUCKET}/`)[1]
+    if (!path) return
+    await supabase.storage.from(POSTER_BUCKET).remove([path])
+  } catch (e) {
+    console.warn('[backendApi] deletePosterImage (non-fatal):', e.message)
+  }
+}

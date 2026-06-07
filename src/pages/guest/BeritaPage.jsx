@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { MapPin, ExternalLink, Search, ChevronRight } from 'lucide-react'
+import { MapPin, ExternalLink, Search, ChevronRight, Image as ImageIcon } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import dayjs from 'dayjs'
 
@@ -14,6 +14,207 @@ const KATEGORI_COLOR = {
 }
 
 const KATEGORI_LIST = ['Semua', 'Festival', 'System', 'Destinasi', 'Lalu Lintas', 'Budaya', 'Umum']
+
+/**
+ * Ekstrak thumbnail dari URL berita menggunakan berbagai strategi:
+ * 1. YouTube → img.youtube.com
+ * 2. Detik  → OG image via allorigins proxy
+ * 3. Kompas, Tribun, Liputan6, CNN Indonesia, dll → OG image via allorigins proxy
+ * 4. Fallback: null (tampilkan placeholder)
+ */
+function extractYoutubeThumbnail(url) {
+  if (!url) return null
+  const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+  if (ytMatch) return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`
+  return null
+}
+
+/**
+ * Buat URL proxy untuk ambil OG image dari domain berita mana pun.
+ * Menggunakan allorigins.win yang bebas CORS.
+ */
+function makeOgProxyUrl(url) {
+  if (!url) return null
+  try {
+    new URL(url) // validasi URL
+    return `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Parse OG image dari HTML string
+ */
+function parseOgImage(html) {
+  const match = html.match(/<meta[^>]+(?:property=["']og:image["']|name=["']og:image["'])[^>]+content=["']([^"']+)["']/i)
+            || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property=["']og:image["']|name=["']og:image["'])/i)
+  return match ? match[1] : null
+}
+
+// Cache thumbnail supaya tidak fetch ulang
+const thumbnailCache = {}
+
+/**
+ * Hook untuk auto-fetch thumbnail dari URL berita apapun
+ */
+function useAutoThumbnail(berita) {
+  const [thumb, setThumb] = useState(berita.thumbnail || null)
+
+  useEffect(() => {
+    const url = berita.embed_url
+    if (!url) return
+
+    // Sudah ada thumbnail di DB → gunakan langsung
+    if (berita.thumbnail) {
+      setThumb(berita.thumbnail)
+      return
+    }
+
+    // YouTube → langsung tanpa fetch
+    const ytThumb = extractYoutubeThumbnail(url)
+    if (ytThumb) {
+      setThumb(ytThumb)
+      return
+    }
+
+    // Cache hit
+    if (thumbnailCache[url] !== undefined) {
+      setThumb(thumbnailCache[url])
+      return
+    }
+
+    // Fetch OG image via proxy
+    const proxyUrl = makeOgProxyUrl(url)
+    if (!proxyUrl) return
+
+    let cancelled = false
+    fetch(proxyUrl)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return
+        const html = data?.contents || ''
+        const ogImage = parseOgImage(html)
+        thumbnailCache[url] = ogImage || null
+        setThumb(ogImage || null)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          thumbnailCache[url] = null
+          setThumb(null)
+        }
+      })
+
+    return () => { cancelled = true }
+  }, [berita.embed_url, berita.thumbnail])
+
+  return thumb
+}
+
+// Komponen card berita dengan thumbnail otomatis
+function BeritaCard({ berita }) {
+  const thumb = useAutoThumbnail(berita)
+  const kat = KATEGORI_COLOR[berita.kategori] || KATEGORI_COLOR['Umum']
+
+  return (
+    <div
+      style={{
+        background: '#fff',
+        borderRadius: 14,
+        overflow: 'hidden',
+        border: '1px solid #f3f4f6',
+        transition: 'box-shadow 0.2s, transform 0.2s',
+        cursor: berita.embed_url ? 'pointer' : 'default',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.09)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'translateY(0)' }}
+      onClick={() => berita.embed_url && window.open(berita.embed_url, '_blank')}
+    >
+      {/* Thumbnail */}
+      <div style={{
+        height: 150,
+        background: thumb
+          ? `url(${thumb}) center/cover no-repeat`
+          : 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+        position: 'relative',
+        flexShrink: 0,
+      }}>
+        {/* Jika tidak ada thumbnail → tampilkan placeholder teks */}
+        {!thumb && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            gap: 6, color: 'rgba(255,255,255,0.35)',
+          }}>
+            <ImageIcon size={28} />
+            <span style={{ fontSize: '0.7rem', letterSpacing: '0.05em' }}>Tanpa Gambar</span>
+          </div>
+        )}
+
+        {berita.embed_url && (
+          <div style={{
+            position: 'absolute', top: 10, right: 10,
+            background: 'rgba(0,0,0,0.5)', borderRadius: 6, padding: '4px 6px',
+          }}>
+            <ExternalLink size={12} color="#fff" />
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Badge kategori + tanggal */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{
+            padding: '2px 10px', borderRadius: 20,
+            fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+            background: kat.bg, color: kat.text,
+          }}>{berita.kategori}</span>
+          <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>
+            {dayjs(berita.created_at).format('DD/MM/YYYY')}
+          </span>
+        </div>
+
+        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111827', margin: '0 0 6px', lineHeight: 1.4 }}>
+          {berita.judul}
+        </h3>
+        <p style={{
+          fontSize: '0.8rem', color: '#6b7280', margin: '0 0 10px', lineHeight: 1.6,
+          overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
+          flex: 1,
+        }}>
+          {berita.isi}
+        </p>
+
+        {/* Footer card */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 8, borderTop: '1px solid #f3f4f6' }}>
+          {berita.lokasi_lat && berita.lokasi_lng && (
+            <Link
+              to={`/map?dest_lat=${berita.lokasi_lat}&dest_lng=${berita.lokasi_lng}&dest_name=${encodeURIComponent(berita.lokasi_nama || 'Lokasi')}`}
+              onClick={e => e.stopPropagation()}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#b91c1c', textDecoration: 'none', fontWeight: 600 }}
+            >
+              <MapPin size={12} /> {berita.lokasi_nama || 'Lihat Lokasi'}
+            </Link>
+          )}
+          {berita.embed_url && (
+            <a
+              href={berita.embed_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#6b7280', textDecoration: 'none', marginLeft: 'auto' }}
+            >
+              <ExternalLink size={12} /> Baca Selengkapnya
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function BeritaPage() {
   const [beritaList, setBeritaList] = useState([])
@@ -113,7 +314,7 @@ export default function BeritaPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20 }}>
             {[1,2,3].map(i => (
               <div key={i} style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', border: '1px solid #f3f4f6' }}>
-                <div style={{ height: 140, background: '#f3f4f6', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                <div style={{ height: 150, background: '#f3f4f6', animation: 'pulse 1.5s ease-in-out infinite' }} />
                 <div style={{ padding: '1rem' }}>
                   <div style={{ height: 14, background: '#f3f4f6', borderRadius: 6, marginBottom: 8 }} />
                   <div style={{ height: 10, background: '#f3f4f6', borderRadius: 6, width: '70%' }} />
@@ -135,91 +336,9 @@ export default function BeritaPage() {
               Menampilkan {filtered.length} berita
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20 }}>
-              {filtered.map(berita => {
-                const kat = KATEGORI_COLOR[berita.kategori] || KATEGORI_COLOR['Umum']
-                return (
-                  <div
-                    key={berita.id}
-                    style={{
-                      background: '#fff',
-                      borderRadius: 14,
-                      overflow: 'hidden',
-                      border: '1px solid #f3f4f6',
-                      transition: 'box-shadow 0.2s, transform 0.2s',
-                      cursor: berita.embed_url ? 'pointer' : 'default',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.09)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
-                    onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'translateY(0)' }}
-                    onClick={() => berita.embed_url && window.open(berita.embed_url, '_blank')}
-                  >
-                    {/* Thumbnail */}
-                    <div style={{
-                      height: 150,
-                      background: berita.thumbnail
-                        ? `url(${berita.thumbnail}) center/cover no-repeat`
-                        : 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                      position: 'relative',
-                    }}>
-                      {berita.embed_url && (
-                        <div style={{
-                          position: 'absolute', top: 10, right: 10,
-                          background: 'rgba(0,0,0,0.5)', borderRadius: 6, padding: '4px 6px',
-                        }}>
-                          <ExternalLink size={12} color="#fff" />
-                        </div>
-                      )}
-                    </div>
-
-                    <div style={{ padding: '1rem' }}>
-                      {/* Badge kategori + tanggal */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <span style={{
-                          padding: '2px 10px', borderRadius: 20,
-                          fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
-                          background: kat.bg, color: kat.text,
-                        }}>{berita.kategori}</span>
-                        <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>
-                          {dayjs(berita.created_at).format('DD/MM/YYYY')}
-                        </span>
-                      </div>
-
-                      <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#111827', margin: '0 0 6px', lineHeight: 1.4 }}>
-                        {berita.judul}
-                      </h3>
-                      <p style={{
-                        fontSize: '0.8rem', color: '#6b7280', margin: '0 0 10px', lineHeight: 1.6,
-                        overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
-                      }}>
-                        {berita.isi}
-                      </p>
-
-                      {/* Footer card */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 8, borderTop: '1px solid #f3f4f6' }}>
-                        {berita.lokasi_lat && berita.lokasi_lng && (
-                          <Link
-                            to={`/map?dest_lat=${berita.lokasi_lat}&dest_lng=${berita.lokasi_lng}&dest_name=${encodeURIComponent(berita.lokasi_nama || 'Lokasi')}`}
-                            onClick={e => e.stopPropagation()}
-                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#b91c1c', textDecoration: 'none', fontWeight: 600 }}
-                          >
-                            <MapPin size={12} /> {berita.lokasi_nama || 'Lihat Lokasi'}
-                          </Link>
-                        )}
-                        {berita.embed_url && (
-                          <a
-                            href={berita.embed_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={e => e.stopPropagation()}
-                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: '#6b7280', textDecoration: 'none', marginLeft: 'auto' }}
-                          >
-                            <ExternalLink size={12} /> Baca Selengkapnya
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+              {filtered.map(berita => (
+                <BeritaCard key={berita.id} berita={berita} />
+              ))}
             </div>
           </>
         )}

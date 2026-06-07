@@ -5,7 +5,6 @@ import L from 'leaflet'
 import Swal from 'sweetalert2'
 
 import {
-  getEvents,
   getClosures,
   createClosure,
   updateClosure,
@@ -14,6 +13,16 @@ import {
 } from '../../lib/backendApi'
 
 import { supabase } from '../../lib/supabase'
+
+// ── Events API — langsung dari Supabase agar semua event terambil ─────────────
+const getEvents = async () => {
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .order('start_time', { ascending: false })
+  if (error) throw error
+  return data || []
+}
 
 // ── Congestion API (langsung ke Supabase, source=manual) ──────────────────────
 const getCongestions = async () => {
@@ -61,10 +70,21 @@ L.Icon.Default.mergeOptions({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const toIso   = v => { const d = new Date(v); return isNaN(d) ? null : d.toISOString() }
-const swalFn  = (icon, title, opts = {}) => Swal.fire({ icon, title, confirmButtonColor: icon === 'success' ? '#16a34a' : icon === 'error' ? '#dc2626' : '#2563eb', confirmButtonText: icon === 'error' ? 'Tutup' : 'OK', ...opts })
-const swalOK  = (title, text) => swalFn('success', title, { text, timer: 3000, timerProgressBar: true })
+const SWAL_TOP = { container: 'swal-on-top' }
+const swalFn  = (icon, title, opts = {}) => Swal.fire({ icon, title, confirmButtonColor: icon === 'success' ? '#16a34a' : icon === 'error' ? '#dc2626' : '#2563eb', confirmButtonText: icon === 'error' ? 'Tutup' : 'OK', customClass: SWAL_TOP, ...opts })
+const swalOK  = (title, text) => Swal.fire({
+  icon: 'success', title, text,
+  timer: 2500, timerProgressBar: true,
+  showConfirmButton: false,
+  toast: true, position: 'top-end',
+  didOpen: (popup) => {
+    // Toast punya container sendiri — set z-index langsung
+    const container = popup.closest('.swal2-container')
+    if (container) container.style.zIndex = '99999'
+  },
+})
 const swalErr = (title, text) => swalFn('error', title, { text: text || 'Terjadi kesalahan.' })
-const swalDel = name => Swal.fire({ icon: 'warning', title: 'Hapus data ini?', html: `<span style="color:#374151;font-size:14px"><b>${name}</b> akan dihapus permanen.</span>`, showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', reverseButtons: true })
+const swalDel = name => Swal.fire({ icon: 'warning', title: 'Hapus data ini?', html: `<span style="color:#374151;font-size:14px"><b>${name}</b> akan dihapus permanen.</span>`, showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#6b7280', confirmButtonText: 'Ya, Hapus!', cancelButtonText: 'Batal', reverseButtons: true, customClass: SWAL_TOP })
 
 // ─── FIX 4: Reverse geocoding — ubah koordinat → nama tempat ──────────────────
 async function reverseGeocode(lat, lng) {
@@ -353,6 +373,7 @@ function useEdgePicker() {
         icon: 'success', title: 'Ruas Jalan Terdeteksi',
         text: `${(e||[]).length} ruas jalan berhasil di-derive.`,
         timer: 2000, timerProgressBar: true, showConfirmButton: false,
+        customClass: SWAL_TOP,
       })
     } catch {
       const fallback = [{
@@ -439,7 +460,7 @@ function HistoryRow({ item, editingId, onEdit, onDelete, badgeClass, badgeLabel,
           {item.reason && <span className="text-sm font-semibold text-gray-900 truncate">{item.reason}</span>}
           {editingId === item.id && (
             <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-700">
-              ✏️ Sedang diedit
+              Sedang Diedit
             </span>
           )}
         </div>
@@ -668,6 +689,9 @@ export default function AdminTraffic() {
 
   return (
     <div>
+      {/* z-index override agar SweetAlert selalu di atas navbar */}
+      <style>{`.swal-on-top { z-index: 99999 !important; }`}</style>
+
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Rekayasa Lalu Lintas</h1>
@@ -730,7 +754,7 @@ export default function AdminTraffic() {
             <div className="overflow-y-auto p-6 space-y-4 border-r border-gray-100" style={{ width: 300, flexShrink: 0 }}>
               <div>
                 <h2 className="text-lg font-bold text-gray-900">
-                  {clForm.id ? '✏️ Edit Rekayasa' : 'Tambah Rekayasa Baru'}
+                  {clForm.id ? 'Edit Rekayasa' : 'Tambah Rekayasa Baru'}
                 </h2>
                 {clForm.id && <p className="text-xs text-blue-600 font-semibold mt-0.5">Mode edit aktif</p>}
               </div>
@@ -781,7 +805,7 @@ export default function AdminTraffic() {
                 )}
                 <button onClick={saveClosure} disabled={saving}
                   className={`${clForm.id ? 'flex-1' : 'w-full'} px-4 py-3 font-bold text-sm rounded-lg transition ${saving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : clForm.id ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}>
-                  {saving ? 'Menyimpan…' : clForm.id ? '✏️ Update Rekayasa' : '➕ Simpan Rekayasa'}
+                  {saving ? 'Menyimpan…' : clForm.id ? 'Update Rekayasa' : 'Simpan Rekayasa'}
                 </button>
               </div>
             </div>
@@ -886,7 +910,7 @@ export default function AdminTraffic() {
                 <b>MODERATE</b> = 2.5× lebih lambat, <b>HEAVY</b> = 5× lebih lambat.
               </p>
               <p className="text-xs text-orange-700 font-semibold mt-1">
-                📋 Halaman ini hanya menampilkan kemacetan yang diinput manual oleh admin. Data realtime TomTom dikelola otomatis oleh sistem.
+                Halaman ini hanya menampilkan kemacetan yang diinput manual oleh admin. Data realtime TomTom dikelola otomatis oleh sistem.
               </p>
             </div>
           </div>
@@ -919,7 +943,7 @@ export default function AdminTraffic() {
             <div className="overflow-y-auto p-6 space-y-4 border-r border-gray-100" style={{ width: 300, flexShrink: 0 }}>
               <div>
                 <h2 className="text-lg font-bold text-gray-900">
-                  {cgForm.id ? '✏️ Edit Kemacetan' : 'Tambah Zona Macet'}
+                  {cgForm.id ? 'Edit Kemacetan' : 'Tambah Zona Macet'}
                 </h2>
                 {cgForm.id && <p className="text-xs text-orange-600 font-semibold mt-0.5">Mode edit aktif</p>}
               </div>
@@ -969,7 +993,7 @@ export default function AdminTraffic() {
                 )}
                 <button onClick={saveCongestion} disabled={cgSaving}
                   className={`${cgForm.id ? 'flex-1' : 'w-full'} px-4 py-3 font-bold text-sm rounded-lg transition ${cgSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : cgForm.id ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-orange-500 hover:bg-orange-600 text-white'}`}>
-                  {cgSaving ? 'Menyimpan…' : cgForm.id ? '✏️ Update Zona Macet' : '➕ Simpan Zona Macet'}
+                  {cgSaving ? 'Menyimpan…' : cgForm.id ? 'Update Zona Macet' : 'Simpan Zona Macet'}
                 </button>
               </div>
             </div>
@@ -1010,7 +1034,7 @@ export default function AdminTraffic() {
                       positions={e.polyline.map(p => [p.lat, p.lng])}
                       pathOptions={{ color: cg.level === 'HEAVY' ? '#ea580c' : '#fb923c', weight: 5, opacity: 0.7, dashArray: '8,4' }}>
                       <Popup>
-                        <p style={{ fontWeight: 'bold', marginBottom: 2 }}>🚦 {cg.level === 'HEAVY' ? 'Macet Parah' : 'Macet Sedang'}</p>
+                        <p style={{ fontWeight: 'bold', marginBottom: 2 }}>{cg.level === 'HEAVY' ? 'Macet Parah' : 'Macet Sedang'}</p>
                         <p style={{ fontSize: 12, color: '#555', marginBottom: 8 }}>{cg.reason || '—'}</p>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => editCongestion(cg)} style={{ flex: 1, padding: '4px 8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Edit</button>
@@ -1054,7 +1078,7 @@ export default function AdminTraffic() {
                   <HistoryRow key={cg.id} item={cg} editingId={cgForm.id}
                     onEdit={editCongestion} onDelete={deleteCg}
                     badgeClass={cg.level === 'HEAVY' ? 'bg-orange-200 text-orange-800' : 'bg-orange-100 text-orange-600'}
-                    badgeLabel={`🚦 ${cg.level}`}
+                    badgeLabel={cg.level}
                     extraInfo={cg.end_time ? <> s/d {dayjs(cg.end_time).format('DD/MM HH:mm')}</> : null} />
                 ))}
               </div>
