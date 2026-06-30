@@ -318,123 +318,180 @@ function ParkingModal({ event, spots, onClose, onRefresh }) {
     }
   }
 
-  return (
-    <div className="fixed inset-0 bg-black/40 z-[500] flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+  // Lock body scroll saat modal terbuka
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
+  const modal = (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 99999,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+      }}
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{
+        background: '#fff',
+        borderRadius: 16,
+        boxShadow: '0 25px 60px rgba(0,0,0,0.25)',
+        width: '100%',
+        maxWidth: 1024,
+        height: '88vh',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 24px', borderBottom: '1px solid #f0f0f0', flexShrink: 0,
+        }}>
           <div>
-            <h2 className="text-base font-bold text-gray-900">Titik Parkir</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Event: <span className="font-semibold text-gray-700">{event.name}</span></p>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111' }}>Titik Parkir</h2>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: '#6b7280' }}>
+              Event: <span style={{ fontWeight: 600, color: '#374151' }}>{event.name}</span>
+            </p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 transition">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+          <button
+            onClick={onClose}
+            style={{
+              width: 32, height: 32, borderRadius: 8, border: 'none', background: 'transparent',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#9ca3af', fontSize: 18, lineHeight: 1, flexShrink: 0,
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            ✕
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
+        {/* Body */}
+        <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
           {/* Kiri: form + daftar */}
-          <div className="p-6 flex flex-col gap-5">
-            <div className="bg-gray-50 rounded-lg border border-gray-100 p-4 space-y-3">
-              <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">
-                {editId ? 'Edit Titik Parkir' : 'Tambah Titik Parkir'}
-              </p>
-              <Field label="Nama" required>
-                <input type="text" name="name" value={form.name} onChange={handleChange}
-                  placeholder="Contoh: Parkir Utara, Parkir Selatan" className={inputCls} />
-              </Field>
-              <Field label="Keterangan">
-                <textarea name="description" value={form.description} onChange={handleChange}
-                  placeholder="Keterangan opsional" rows={2} className={inputCls} />
-              </Field>
-              <Field label="Kapasitas Kendaraan">
-                <input type="number" name="capacity" value={form.capacity} onChange={handleChange}
-                  placeholder="Opsional" min={0} className={inputCls} />
-              </Field>
-              <div className="bg-white rounded-lg px-3 py-2 border border-gray-200">
-                <p className="text-xs text-gray-500 font-mono">{parseFloat(form.lat).toFixed(5)}, {parseFloat(form.lng).toFixed(5)}</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">Klik peta untuk pin lokasi parkir</p>
-              </div>
-              <div className="flex gap-2">
-                {editId && (
-                  <button onClick={resetForm}
-                    className="flex-1 px-3 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
-                    Batal Edit
+          <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 0 20px' }}>
+              {/* Form */}
+              <div style={{ background: '#f9fafb', borderRadius: 10, border: '1px solid #e5e7eb', padding: '14px 14px 10px', marginBottom: 16 }}>
+                <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {editId ? 'Edit Titik Parkir' : 'Tambah Titik Parkir'}
+                </p>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={lblStyle}>Nama <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input type="text" name="name" value={form.name} onChange={handleChange}
+                    placeholder="Contoh: Parkir Utara, Parkir Selatan" style={inpStyle} />
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={lblStyle}>Keterangan</label>
+                  <textarea name="description" value={form.description} onChange={handleChange}
+                    placeholder="Keterangan opsional" rows={2}
+                    style={{ ...inpStyle, resize: 'vertical', minHeight: 56 }} />
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={lblStyle}>Kapasitas Kendaraan</label>
+                  <input type="number" name="capacity" value={form.capacity} onChange={handleChange}
+                    placeholder="Opsional" min={0} style={inpStyle} />
+                </div>
+                <div style={{ background: '#fff', borderRadius: 8, padding: '8px 10px', border: '1px solid #e5e7eb', marginBottom: 10 }}>
+                  <p style={{ margin: 0, fontSize: 11, fontFamily: 'monospace', color: '#374151' }}>
+                    {parseFloat(form.lat).toFixed(5)}, {parseFloat(form.lng).toFixed(5)}
+                  </p>
+                  <p style={{ margin: '2px 0 0', fontSize: 10, color: '#9ca3af' }}>Klik peta untuk pin lokasi parkir</p>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {editId && (
+                    <button onClick={resetForm} style={{
+                      flex: 1, padding: '8px 0', fontSize: 13, fontWeight: 600,
+                      color: '#374151', background: '#e5e7eb', border: 'none', borderRadius: 8, cursor: 'pointer',
+                    }}>Batal Edit</button>
+                  )}
+                  <button onClick={handleSave} disabled={saving} style={{
+                    flex: 1, padding: '8px 0', fontSize: 13, fontWeight: 600,
+                    color: '#fff', background: saving ? '#9ca3af' : '#1d4ed8',
+                    border: 'none', borderRadius: 8, cursor: saving ? 'not-allowed' : 'pointer',
+                  }}>
+                    {saving ? 'Menyimpan...' : editId ? 'Update' : 'Tambah'}
                   </button>
-                )}
-                <button onClick={handleSave} disabled={saving}
-                  className={`flex-1 px-3 py-2 text-sm font-semibold text-white rounded-lg transition
-                    ${saving ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-700 hover:bg-blue-800'}`}>
-                  {saving ? 'Menyimpan...' : editId ? 'Update' : 'Tambah'}
-                </button>
+                </div>
               </div>
-            </div>
 
-            {/* Daftar parkir */}
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
-                Daftar Parkir ({eventSpots.length})
-              </p>
-              {eventSpots.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-gray-200 py-8 text-center">
-                  <p className="text-sm text-gray-400">Belum ada titik parkir untuk event ini.</p>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                  {eventSpots.map(spot => (
-                    <div key={spot.id}
-                      className={`flex items-start justify-between px-3 py-2.5 rounded-lg border transition
-                        ${editId === spot.id ? 'border-blue-300 bg-blue-50' : 'border-gray-100 bg-white hover:border-gray-200'}`}>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{spot.name}</p>
-                        {spot.description && <p className="text-xs text-gray-500 truncate">{spot.description}</p>}
-                        {spot.capacity != null && <p className="text-xs text-blue-700 font-medium">Kapasitas: {spot.capacity} kendaraan</p>}
-                        <p className="text-[10px] text-gray-400 font-mono mt-0.5">{spot.lat?.toFixed(5)}, {spot.lng?.toFixed(5)}</p>
+              {/* Daftar parkir */}
+              <div style={{ marginBottom: 16 }}>
+                <p style={{ ...lblStyle, marginBottom: 8 }}>Daftar Parkir ({eventSpots.length})</p>
+                {eventSpots.length === 0 ? (
+                  <div style={{ border: '1.5px dashed #e5e7eb', borderRadius: 8, padding: '24px 0', textAlign: 'center' }}>
+                    <p style={{ margin: 0, fontSize: 13, color: '#9ca3af' }}>Belum ada titik parkir untuk event ini.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {eventSpots.map(spot => (
+                      <div key={spot.id} style={{
+                        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+                        padding: '10px 12px', borderRadius: 8, border: `1px solid ${editId === spot.id ? '#93c5fd' : '#e5e7eb'}`,
+                        background: editId === spot.id ? '#eff6ff' : '#fff',
+                      }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{spot.name}</p>
+                          {spot.description && <p style={{ margin: '1px 0 0', fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{spot.description}</p>}
+                          {spot.capacity != null && <p style={{ margin: '1px 0 0', fontSize: 11, color: '#1d4ed8', fontWeight: 500 }}>Kapasitas: {spot.capacity} kendaraan</p>}
+                          <p style={{ margin: '2px 0 0', fontSize: 10, color: '#9ca3af', fontFamily: 'monospace' }}>{spot.lat?.toFixed(5)}, {spot.lng?.toFixed(5)}</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 10 }}>
+                          <button onClick={() => startEdit(spot)} style={{
+                            padding: '4px 10px', fontSize: 11, fontWeight: 600, color: '#1d4ed8',
+                            border: '1px solid #bfdbfe', borderRadius: 6, background: '#fff', cursor: 'pointer',
+                          }}>Edit</button>
+                          <button onClick={() => requestDelete(spot.id, spot.name)} style={{
+                            padding: '4px 10px', fontSize: 11, fontWeight: 600, color: '#dc2626',
+                            border: '1px solid #fecaca', borderRadius: 6, background: '#fff', cursor: 'pointer',
+                          }}>Hapus</button>
+                        </div>
                       </div>
-                      <div className="flex gap-1.5 flex-shrink-0 ml-3">
-                        <button onClick={() => startEdit(spot)}
-                          className="px-2.5 py-1 text-xs font-semibold text-blue-700 border border-blue-200 rounded-md hover:bg-blue-50 transition">
-                          Edit
-                        </button>
-                        <button onClick={() => requestDelete(spot.id, spot.name)}
-                          className="px-2.5 py-1 text-xs font-semibold text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition">
-                          Hapus
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Kanan: peta */}
-          <div className="p-4">
-            <p className="text-xs font-semibold text-gray-500 mb-2">
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 14, minWidth: 0 }}>
+            <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 600, color: '#6b7280', flexShrink: 0 }}>
               Klik peta untuk pin lokasi parkir
-              <span className="text-gray-400 ml-1">(merah = event, biru = parkir)</span>
+              <span style={{ color: '#9ca3af', marginLeft: 4 }}>(merah = event, biru = parkir)</span>
             </p>
-            <MapContainer center={[event.lat, event.lng]} zoom={15} className="h-[520px] w-full rounded-lg border border-gray-200">
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
-              <MapPicker onPick={handleMapPick} />
-              <Marker position={[event.lat, event.lng]}>
-                <Popup><strong>Lokasi Event</strong><br />{event.name}</Popup>
-              </Marker>
-              {eventSpots.map(spot => (
-                <Marker key={spot.id} position={[spot.lat, spot.lng]} icon={blueIcon}>
-                  <Popup><strong>{spot.name}</strong><br />{spot.description || '—'}<br />{spot.capacity != null ? `Kapasitas: ${spot.capacity}` : ''}</Popup>
+            <div style={{ flex: 1, borderRadius: 10, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+              <MapContainer center={[event.lat, event.lng]} zoom={15} style={{ height: '100%', width: '100%' }}>
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
+                <MapPicker onPick={handleMapPick} />
+                <Marker position={[event.lat, event.lng]}>
+                  <Popup><strong>Lokasi Event</strong><br />{event.name}</Popup>
                 </Marker>
-              ))}
-              <Marker position={[marker.lat, marker.lng]} icon={blueIcon}>
-                <Popup>Posisi parkir<br />{marker.lat.toFixed(5)}, {marker.lng.toFixed(5)}</Popup>
-              </Marker>
-            </MapContainer>
+                {eventSpots.map(spot => (
+                  <Marker key={spot.id} position={[spot.lat, spot.lng]} icon={blueIcon}>
+                    <Popup><strong>{spot.name}</strong><br />{spot.description || '—'}<br />{spot.capacity != null ? `Kapasitas: ${spot.capacity}` : ''}</Popup>
+                  </Marker>
+                ))}
+                <Marker position={[marker.lat, marker.lng]} icon={blueIcon}>
+                  <Popup>Posisi parkir<br />{marker.lat.toFixed(5)}, {marker.lng.toFixed(5)}</Popup>
+                </Marker>
+              </MapContainer>
+            </div>
           </div>
         </div>
       </div>
     </div>
   )
+
+  return createPortal(modal, document.body)
 }
 
 // ─── Komponen utama AdminEvent ────────────────────────────────────────────────
