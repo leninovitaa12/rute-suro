@@ -721,12 +721,106 @@ export default function UserMapPage() {
             </div>
 
             <p className="text-[10px] font-bold text-[#6B6560] uppercase tracking-wide mb-1">1. Pilih Event</p>
-            <select value={selectedEventId}
-              onChange={e => { setSelectedEventId(e.target.value); setSelectedParkingId(''); setDestinationType(null) }}
-              className="w-full px-3 py-2.5 border border-[#DDD8D0] rounded-xl text-[#2B3440] font-semibold text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#8b1a1a]/30 focus:border-[#8b1a1a] transition">
-              <option value="">-- pilih event --</option>
-              {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}{ev.start_time ? ` (${dayjs(ev.start_time).format('DD/MM HH:mm')})` : ''}</option>)}
-            </select>
+            {/* Custom Event Dropdown dengan status berwarna */}
+              {(() => {
+                const [evDropOpen, setEvDropOpen] = React.useState(false)
+                const evDropRef = React.useRef(null)
+
+                React.useEffect(() => {
+                  const fn = e => { if (evDropRef.current && !evDropRef.current.contains(e.target)) setEvDropOpen(false) }
+                  document.addEventListener('mousedown', fn)
+                  return () => document.removeEventListener('mousedown', fn)
+                }, [])
+
+                function getEventStatus(ev) {
+                  const now   = dayjs()
+                  const start = ev.start_time ? dayjs(ev.start_time) : null
+                  const end   = ev.end_time   ? dayjs(ev.end_time)   : null
+                  if (!start) return { label: 'Tidak Diketahui', bg: 'bg-gray-100', text: 'text-gray-500', dot: 'bg-gray-400' }
+                  if (now.isBefore(start))  return { label: 'Akan Datang',  bg: 'bg-blue-50',   text: 'text-blue-700',  dot: 'bg-blue-500' }
+                  if (end && now.isAfter(end)) return { label: 'Selesai',   bg: 'bg-gray-100',  text: 'text-gray-500',  dot: 'bg-gray-400' }
+                  return { label: 'Berlangsung', bg: 'bg-green-50', text: 'text-green-700', dot: 'bg-green-500' }
+                }
+
+                const selectedEv = events.find(e => e.id === selectedEventId)
+                const selectedStatus = selectedEv ? getEventStatus(selectedEv) : null
+
+                return (
+                  <div ref={evDropRef} className="relative w-full">
+                    {/* Trigger button */}
+                    <button
+                      type="button"
+                      onClick={() => setEvDropOpen(v => !v)}
+                      className="w-full flex items-center justify-between px-3 py-2.5 border border-[#DDD8D0] rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#8b1a1a]/30 focus:border-[#8b1a1a] transition hover:bg-[#F4F2EF]"
+                    >
+                      {selectedEv ? (
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide ${selectedStatus.bg} ${selectedStatus.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${selectedStatus.dot}`} />
+                            {selectedStatus.label}
+                          </span>
+                          <span className="font-semibold text-[#2B3440] truncate">{selectedEv.name}</span>
+                        </div>
+                      ) : (
+                        <span className="text-[#A09890] font-semibold">-- pilih event --</span>
+                      )}
+                      <svg className={`w-4 h-4 text-[#6B6560] flex-shrink-0 ml-2 transition-transform ${evDropOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {/* Dropdown list */}
+                    {evDropOpen && (
+                      <div className="absolute left-0 right-0 z-[9999] mt-1 bg-white rounded-xl border border-[#DDD8D0] shadow-xl overflow-hidden max-h-64 overflow-y-auto">
+                        {/* Reset option */}
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedEventId(''); setSelectedParkingId(''); setDestinationType(null); setEvDropOpen(false) }}
+                          className="w-full text-left px-3 py-2.5 text-xs text-[#A09890] font-semibold hover:bg-[#F4F2EF] border-b border-[#F4F2EF] transition"
+                        >
+                          -- pilih event --
+                        </button>
+
+                        {events.map(ev => {
+                          const st = getEventStatus(ev)
+                          const isSelected = ev.id === selectedEventId
+                          return (
+                            <button
+                              key={ev.id}
+                              type="button"
+                              onClick={() => { setSelectedEventId(ev.id); setSelectedParkingId(''); setDestinationType(null); setEvDropOpen(false) }}
+                              className={`w-full text-left px-3 py-2.5 border-b last:border-0 border-[#F4F2EF] transition flex items-start gap-2.5
+                                ${isSelected ? 'bg-[#FEF5F5]' : 'hover:bg-[#F4F2EF]'}`}
+                            >
+                              {/* Status badge */}
+                              <span className={`flex-shrink-0 mt-0.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide ${st.bg} ${st.text}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${st.dot}`} />
+                                {st.label}
+                              </span>
+                              {/* Event info */}
+                              <div className="min-w-0 flex-1">
+                                <p className={`text-xs font-bold truncate ${isSelected ? 'text-[#8b1a1a]' : 'text-[#2B3440]'}`}>{ev.name}</p>
+                                {ev.start_time && (
+                                  <p className="text-[10px] text-[#6B6560] font-semibold mt-0.5">
+                                    {dayjs(ev.start_time).format('DD MMM YYYY · HH:mm')}
+                                    {ev.end_time ? ` – ${dayjs(ev.end_time).format('HH:mm')}` : ''}
+                                  </p>
+                                )}
+                              </div>
+                              {/* Checkmark if selected */}
+                              {isSelected && (
+                                <svg className="w-4 h-4 text-[#8b1a1a] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
 
             {selectedEventId && (
               <button onClick={applyEventAsDestination}
