@@ -333,7 +333,7 @@ export default function HeroSection() {
             maxWidth: '500px', marginBottom: '36px',
             textShadow: '0 1px 10px rgba(0,0,0,0.35)',
           }}>
-            Navigasi cerdas menggunakan algoritma A* untuk memastikan perjalanan
+            Navigasi cerdas untuk memastikan perjalanan
             Grebeg Suro berjalan lancar, efisien, dan tepat sesuai kebutuhan masyarakat.
           </p>
 
